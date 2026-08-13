@@ -358,7 +358,14 @@ static Term *parse_atom(Parser *p) {
         DhallError ie;
         dhall_error_clear(&ie);
         Term *r = import_resolve(p->loader, t.name, p, &ie);
-        if (!r) { ie.span = t.span; ie.has_span = (t.span.line > 0); p->err = ie; return NULL; }
+        if (!r) {
+            /* Only attach the import site when the inner error carried no
+               location of its own (env/missing/cycle/depth).  Preserve the
+               imported file's file:line:col for parse/lex errors. */
+            if (!ie.has_span) { ie.span = t.span; ie.has_span = (t.span.line > 0); }
+            p->err = ie;
+            return NULL;
+        }
         return r;
     }
     case T_LPAREN: {

@@ -42,7 +42,10 @@ bidirectional typechecking) includes:
   `Natural`/`Integer`/`Double` (equality also over `Bool`/`Text`), plus
   `Natural/isZero`, `Natural/show`, `Natural/subtract`, `Natural/fold`.
 - **Assertions** — `assert : body` where `body : Bool` and normalizes to
-  `True`.
+  `True`. Note: the assertion is enforced during `typecheck`; the
+  `normalize` and `to-json` modes do not typecheck first, so `assert : False`
+  there evaluates to `true` without an error (always typecheck first to rely
+  on the guarantee).
 - **Imports** — local file imports and `env:` imports (see below).
 
 ### Arithmetic semantics
