@@ -69,6 +69,23 @@ static bool is_name_char(int c) { return c != -1 && (isalnum(c) || c == '_' || c
 
 static bool is_digit(int c) { return c >= '0' && c <= '9'; }
 
+/* is the current char a +/- that begins a signed literal? a sign starts a
+   signed literal only when it is followed (possibly after whitespace) by a
+   digit. Non-consuming: only inspects lx->src. */
+static bool sign_starts_literal(Lexer *lx) {
+    size_t p = lx->pos;
+    if (p >= lx->len) return false;
+    int s = (unsigned char)lx->src[p];
+    if (s != '+' && s != '-') return false;
+    p++;
+    while (p < lx->len) {
+        int w = (unsigned char)lx->src[p];
+        if (w == ' ' || w == '\t' || w == '\r' || w == '\n') p++;
+        else break;
+    }
+    return p < lx->len && is_digit((unsigned char)lx->src[p]);
+}
+
 static bool is_import_path_char(int c) {
     if (c == -1) return false;
     if (isalnum(c)) return true;
@@ -81,7 +98,7 @@ static bool tok_ends_operand(TokType t, const char *name) {
     switch (t) {
     case T_NAT: case T_INT: case T_DBL:
     case T_RPAREN: case T_RBRACKET: case T_RBRACE: case T_RANGLE:
-    case T_IMPORT:
+    case T_IMPORT: case T_STR_OPEN:
         return true;
     case T_NAME:
         return !builtin_is_keyword(name);
@@ -115,10 +132,13 @@ static Token tokenize(Lexer *lx) {
     /* number: +n / -n / 0 -> Integer; digits -> Natural/Double.
        A +/- is a signed-literal prefix only when NOT after an operand. */
     if (is_digit(c) || ((c == '+' || c == '-') && !lx->after_operand &&
-                        lx->pos + 1 < lx->len && is_digit((unsigned char)lx->src[lx->pos + 1]))) {
+                        sign_starts_literal(lx))) {
         /* signed literal */
         if (c == '+' || c == '-') {
             lexer_read_char(lx);
+            /* allow whitespace between the sign and the digits (`- 5`) */
+            while (cur(lx) == ' ' || cur(lx) == '\t' || cur(lx) == '\r' || cur(lx) == '\n')
+                lexer_read_char(lx);
             if (!is_digit(cur(lx))) {
                 lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
                 snprintf(lx->err.msg, sizeof(lx->err.msg), "expected digits after sign");

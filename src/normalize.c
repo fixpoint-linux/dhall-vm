@@ -364,7 +364,15 @@ Term *normalize(Term *t) {
     case TmSome: return tm_some(normalize(t->as.some.val));
     case TmNone: return tm_none(normalize(t->as.none.ty));
     case TmOp:   return norm_op(t);
-    case TmAssert: return tm_bool(true);
+    case TmAssert: {
+        Term *b = normalize(t->as.assert_.body);
+        /* only a literal True assertion holds; never claim true blindly */
+        if (b->tag == TmConst && b->as.c.kind == C_BOOL && b->as.c.b)
+            return tm_bool(true);
+        if (b->tag == TmConst && b->as.c.kind == C_BOOL && !b->as.c.b)
+            norm_set_error(t->loc, "assertion did not hold");
+        return tm_assert(b); /* stuck / non-Bool body: keep the assert */
+    }
     case TmToMap: return norm_tomap(t);
     }
     return t;

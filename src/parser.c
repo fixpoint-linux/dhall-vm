@@ -447,6 +447,7 @@ static Term *parse_text(Parser *p) {
             lexer_read_char(&p->lx); /* $ */
             lexer_read_char(&p->lx); /* { */
             text_add_part(p, &buf, &open, &head, &tail);
+            p->lx.after_operand = false; /* ${ starts a fresh expression context */
             Term *expr = parse_term(p);
             if (!expr) return NULL;
             Token cl = lexer_next(&p->lx);
