@@ -296,7 +296,7 @@ static void print_rec_fields(FILE *out, Field *fs, int n, bool types) {
     for (int i = 0; i < n; i++) {
         if (i) fputc(',', out);
         fputs(fs[i].label, out);
-        fputc(':', out);
+        fputs(types ? ":" : "=", out);
         if (types) print_term(out, fs[i].type);
         else print_term(out, fs[i].value);
     }
@@ -342,7 +342,18 @@ void print_term(FILE *out, Term *t) {
         switch (t->as.c.kind) {
         case C_NAT: fprintf(out, "%llu", (unsigned long long)t->as.c.nat); break;
         case C_INT: fprintf(out, "%lld", (long long)t->as.c.i64); break;
-        case C_DBL: fprintf(out, "%g", t->as.c.dbl); break;
+        case C_DBL: {
+            char dbuf[64];
+            snprintf(dbuf, sizeof(dbuf), "%g", t->as.c.dbl);
+            fputs(dbuf, out);
+            /* %g drops the decimal point for whole numbers; a Dhall Double
+               literal must contain '.' or an exponent, so re-add ".0".
+               (inf/nan are already a documented deviation — leave as-is.) */
+            if (!strchr(dbuf, '.') && !strchr(dbuf, 'e') && !strchr(dbuf, 'E') &&
+                !strchr(dbuf, 'n') && !strchr(dbuf, 'i'))
+                fputs(".0", out);
+            break;
+        }
         case C_BOOL: fputs(t->as.c.b ? "True" : "False", out); break;
         }
         break;

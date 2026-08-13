@@ -59,6 +59,7 @@ static int lookup_name(Parser *p, const char *name) {
 /* ---------- forward decls ---------- */
 
 static Term *parse_term(Parser *p);
+static Term *parse_term_impl(Parser *p);
 static Term *parse_let(Parser *p);
 static Term *parse_if(Parser *p);
 static Term *parse_arrow(Parser *p);
@@ -105,7 +106,20 @@ static void sort_fields(Field *fs, int n) {
 
 /* ---------- grammar ---------- */
 
+/* parse_term — recursion-depth-guarded entry point. Deeply nested input
+   would otherwise exhaust the C stack (SIGSEGV); fail cleanly instead. */
 static Term *parse_term(Parser *p) {
+    if (p->depth >= PARSE_MAX_DEPTH) {
+        perr(p, peek(p).span, "expression nesting too deep (max %d)", PARSE_MAX_DEPTH);
+        return NULL;
+    }
+    p->depth++;
+    Term *r = parse_term_impl(p);
+    p->depth--;
+    return r;
+}
+
+static Term *parse_term_impl(Parser *p) {
     if (at_name(p, "let")) return parse_let(p);
     if (at_name(p, "if")) return parse_if(p);
     if (at(p, T_LAMBDA)) return parse_lambda(p);

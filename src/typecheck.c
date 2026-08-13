@@ -274,7 +274,13 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
                 err_here(err, ERR_TYPE, t, "merge handler '%s' domain does not match alternative type", label);
                 return NULL;
             }
-            if (!result) result = hTy->as.pi.cod;
+            Term *cod = normalize(hTy->as.pi.cod);
+            if (!result) {
+                result = cod;
+            } else if (!alpha_eq(result, cod)) {
+                err_here(err, ERR_TYPE, t, "merge handlers do not have a common result type (handler '%s')", label);
+                return NULL;
+            }
         }
         if (!result) { err_here(err, ERR_TYPE, t, "merge of an empty union"); return NULL; }
         return result;

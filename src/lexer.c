@@ -100,11 +100,29 @@ static Token tokenize(Lexer *lx) {
                 r.c = (Const){ C_DBL, 0, 0, v, false };
                 return r;
             }
-            int64_t v = (int64_t)t.c.nat;
-            if (c == '-') v = -v;
-            Token r = mk_tok(T_INT, sp);
-            r.c = (Const){ C_INT, 0, v, 0, false };
-            return r;
+            /* Integer: range-check the magnitude before signed conversion to
+               avoid implementation-defined cast and signed-negation UB. */
+            uint64_t mag = t.c.nat;
+            if (c == '-') {
+                if (mag > (uint64_t)INT64_MAX + 1u) {
+                    lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
+                    snprintf(lx->err.msg, sizeof(lx->err.msg), "Integer literal overflow");
+                    return mk_tok(T_ERROR, sp);
+                }
+                int64_t v = (mag == (uint64_t)INT64_MAX + 1u) ? INT64_MIN : -(int64_t)mag;
+                Token r = mk_tok(T_INT, sp);
+                r.c = (Const){ C_INT, 0, v, 0, false };
+                return r;
+            } else {
+                if (mag > (uint64_t)INT64_MAX) {
+                    lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
+                    snprintf(lx->err.msg, sizeof(lx->err.msg), "Integer literal overflow");
+                    return mk_tok(T_ERROR, sp);
+                }
+                Token r = mk_tok(T_INT, sp);
+                r.c = (Const){ C_INT, 0, (int64_t)mag, 0, false };
+                return r;
+            }
         }
         /* unsigned literal */
         size_t start = lx->pos;

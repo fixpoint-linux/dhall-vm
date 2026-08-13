@@ -1,1 +1,1 @@
-merge {Left=\(x:Natural)->x, Right=\(b:Bool)->b} (<Left=5|Right:Bool>)
+merge {A=\(x:Natural)->x, B=\(b:Bool)->0} (<A=5|B:Bool>)

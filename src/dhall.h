@@ -234,8 +234,11 @@ typedef struct {
     /* de Bruijn name resolution stack */
     const char **names;
     int nnames, namescap;
+    int depth;              /* current parser recursion depth (DoS guard) */
     DhallError err;
 } Parser;
+
+#define PARSE_MAX_DEPTH 1000   /* error (not crash) beyond this nesting depth */
 
 Term *parse_source(Parser *p, const char *src, DhallError *err);
 
