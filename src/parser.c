@@ -1,7 +1,14 @@
 /* parser.c — recursive-descent parser for the Dhall subset.
    Resolves names to de Bruijn indices at parse time. Records/union
    fields are sorted by label and made duplicate-free. Handles string
-   interpolation via raw-char reading with recursive expression parsing. */
+   interpolation via raw-char reading with recursive expression parsing.
+
+   Precedence (loosest→tightest):
+     ->  <  :  <  comparison(== != < <= > >=)  <  additive(+ - ++)
+        <  multiplicative(*)  <  application
+   Every constructed term's .loc is stamped (tloc) from the current token
+   so type errors report file:line:col. Imports are inlined at parse time
+   (no TmImport tag survives; the loader lives in Parser.loader). */
 #include "dhall.h"
 #include <ctype.h>
 
@@ -16,6 +23,12 @@ static bool at_name(Parser *p, const char *s) {
 static bool parser_err(Parser *p) { return p->err.stage != ERR_NONE || p->lx.err.stage != ERR_NONE; }
 
 static SourceSpan no_span(void) { return SPAN_NONE; }
+
+/* stamp a constructed term's source location */
+static Term *tloc(Term *t, SourceSpan sp) {
+    if (t) t->loc = sp;
+    return t;
+}
 
 static void perr(Parser *p, SourceSpan sp, const char *fmt, ...) {
     if (parser_err(p)) return;
@@ -62,8 +75,12 @@ static Term *parse_term(Parser *p);
 static Term *parse_term_impl(Parser *p);
 static Term *parse_let(Parser *p);
 static Term *parse_if(Parser *p);
+static Term *parse_assert(Parser *p);
 static Term *parse_arrow(Parser *p);
 static Term *parse_annotation(Parser *p);
+static Term *parse_comparison(Parser *p);
+static Term *parse_additive(Parser *p);
+static Term *parse_multiplicative(Parser *p);
 static Term *parse_merge(Parser *p);
 static Term *parse_application(Parser *p);
 static Term *parse_field(Parser *p);
@@ -77,11 +94,7 @@ static Term *parse_forall(Parser *p);
 
 /* ---------- helpers ---------- */
 
-static bool is_keyword(const char *s) {
-    return !strcmp(s, "let") || !strcmp(s, "in") || !strcmp(s, "if") ||
-           !strcmp(s, "then") || !strcmp(s, "else") || !strcmp(s, "merge") ||
-           !strcmp(s, "forall");
-}
+static bool is_keyword(const char *s) { return builtin_is_keyword(s); }
 
 static bool can_start_atom(Parser *p) {
     Token t = peek(p);
@@ -89,7 +102,7 @@ static bool can_start_atom(Parser *p) {
     case T_NAME: return t.name && !is_keyword(t.name);
     case T_NAT: case T_INT: case T_DBL: case T_STR_OPEN:
     case T_LPAREN: case T_LBRACE: case T_LANGLE: case T_LBRACKET:
-    case T_LAMBDA:
+    case T_LAMBDA: case T_IMPORT:
         return true;
     default: return false;
     }
@@ -122,13 +135,14 @@ static Term *parse_term(Parser *p) {
 static Term *parse_term_impl(Parser *p) {
     if (at_name(p, "let")) return parse_let(p);
     if (at_name(p, "if")) return parse_if(p);
+    if (at_name(p, "assert")) return parse_assert(p);
     if (at(p, T_LAMBDA)) return parse_lambda(p);
     if (at_name(p, "forall")) return parse_forall(p);
     return parse_arrow(p);
 }
 
 static Term *parse_let(Parser *p) {
-    next(p); /* let */
+    Token lt = next(p); /* let */
     Token nt = peek(p);
     if (nt.type != T_NAME || is_keyword(nt.name)) { perr(p, nt.span, "expected variable name after let"); return NULL; }
     next(p);
@@ -147,11 +161,11 @@ static Term *parse_let(Parser *p) {
     Term *body = parse_term(p);
     pop_name(p);
     if (!body) return NULL;
-    return tm_let(ann, val, body);
+    return tloc(tm_let(ann, val, body), lt.span);
 }
 
 static Term *parse_if(Parser *p) {
-    next(p); /* if */
+    Token it = next(p); /* if */
     Term *c = parse_term(p);
     if (!c) return NULL;
     if (!at_name(p, "then")) { perr(p, peek(p).span, "expected 'then'"); return NULL; }
@@ -162,11 +176,19 @@ static Term *parse_if(Parser *p) {
     next(p);
     Term *e = parse_term(p);
     if (!e) return NULL;
-    return tm_if(c, t, e);
+    return tloc(tm_if(c, t, e), it.span);
+}
+
+static Term *parse_assert(Parser *p) {
+    Token at_ = next(p); /* assert */
+    if (!expect(p, T_COLON, "':' after assert")) return NULL;
+    Term *body = parse_term(p);
+    if (!body) return NULL;
+    return tloc(tm_assert(body), at_.span);
 }
 
 static Term *parse_lambda(Parser *p) {
-    next(p); /* \ */
+    Token lt = next(p); /* \ */
     if (!expect(p, T_LPAREN, "'(' in lambda")) return NULL;
     Token nt = peek(p);
     if (nt.type != T_NAME || is_keyword(nt.name)) { perr(p, nt.span, "expected parameter name in lambda"); return NULL; }
@@ -180,11 +202,11 @@ static Term *parse_lambda(Parser *p) {
     Term *body = parse_term(p);
     pop_name(p);
     if (!body) return NULL;
-    return tm_lam(dom, body);
+    return tloc(tm_lam(dom, body), lt.span);
 }
 
 static Term *parse_forall(Parser *p) {
-    next(p); /* forall */
+    Token ft = next(p); /* forall */
     if (!expect(p, T_LPAREN, "'(' in forall")) return NULL;
     Token nt = peek(p);
     if (nt.type != T_NAME || is_keyword(nt.name)) { perr(p, nt.span, "expected binder name in forall"); return NULL; }
@@ -198,50 +220,102 @@ static Term *parse_forall(Parser *p) {
     Term *cod = parse_term(p);
     pop_name(p);
     if (!cod) return NULL;
-    return tm_pi(dom, cod);
+    return tloc(tm_pi(dom, cod), ft.span);
 }
 
 static Term *parse_arrow(Parser *p) {
     Term *left = parse_annotation(p);
     if (!left) return NULL;
-    /* text append: "a" ++ "b" (low precedence) */
-    while (at(p, T_PLUSPLUS)) {
-        next(p);
-        Term *right = parse_annotation(p);
-        if (!right) return NULL;
-        left = tm_append(left, right);
-    }
     if (at(p, T_ARROW)) {
-        next(p);
+        Token ar = next(p);
         push_name(p, "_");
         Term *right = parse_arrow(p);
         pop_name(p);
         if (!right) return NULL;
-        return tm_pi(left, right);
+        return tloc(tm_pi(left, right), ar.span);
     }
     return left;
 }
 
 static Term *parse_annotation(Parser *p) {
-    Term *e = parse_merge(p);
+    Term *e = parse_comparison(p);
     if (!e) return NULL;
     if (at(p, T_COLON)) {
-        next(p);
+        Token cn = next(p);
         Term *ty = parse_arrow(p);
         if (!ty) return NULL;
-        return tm_ann(e, ty);
+        return tloc(tm_ann(e, ty), cn.span);
     }
     return e;
 }
 
+static Term *parse_comparison(Parser *p) {
+    if (p->union_depth > 0) return parse_additive(p); /* no comparison in union alts */
+    Term *left = parse_additive(p);
+    if (!left) return NULL;
+    for (;;) {
+        Token op_tk = peek(p);
+        OpKind op;
+        if (op_tk.type == T_EQEQ) op = OP_EQ;
+        else if (op_tk.type == T_NE) op = OP_NE;
+        else if (op_tk.type == T_LT) op = OP_LT;
+        else if (op_tk.type == T_LE) op = OP_LE;
+        else if (op_tk.type == T_RANGLE) op = OP_GT;
+        else if (op_tk.type == T_GE) op = OP_GE;
+        else break;
+        next(p);
+        Term *r = parse_additive(p);
+        if (!r) return NULL;
+        left = tloc(tm_op(op, left, r), op_tk.span);
+    }
+    return left;
+}
+
+static Term *parse_additive(Parser *p) {
+    Term *left = parse_multiplicative(p);
+    if (!left) return NULL;
+    for (;;) {
+        Token op_tk = peek(p);
+        if (op_tk.type == T_PLUS) {
+            next(p);
+            Term *r = parse_multiplicative(p);
+            if (!r) return NULL;
+            left = tloc(tm_op(OP_ADD, left, r), op_tk.span);
+        } else if (op_tk.type == T_MINUS) {
+            next(p);
+            Term *r = parse_multiplicative(p);
+            if (!r) return NULL;
+            left = tloc(tm_op(OP_SUB, left, r), op_tk.span);
+        } else if (op_tk.type == T_PLUSPLUS) {
+            next(p);
+            Term *r = parse_multiplicative(p);
+            if (!r) return NULL;
+            left = tloc(tm_append(left, r), op_tk.span);
+        } else break;
+    }
+    return left;
+}
+
+static Term *parse_multiplicative(Parser *p) {
+    Term *left = parse_merge(p);
+    if (!left) return NULL;
+    while (at(p, T_STAR)) {
+        Token op_tk = next(p);
+        Term *r = parse_merge(p);
+        if (!r) return NULL;
+        left = tloc(tm_op(OP_MUL, left, r), op_tk.span);
+    }
+    return left;
+}
+
 static Term *parse_merge(Parser *p) {
     if (at_name(p, "merge")) {
-        next(p);
+        Token mt = next(p);
         Term *h = parse_field(p);
         if (!h) return NULL;
         Term *u = parse_field(p);
         if (!u) return NULL;
-        return tm_merge(h, u);
+        return tloc(tm_merge(h, u), mt.span);
     }
     return parse_application(p);
 }
@@ -252,7 +326,7 @@ static Term *parse_application(Parser *p) {
     while (can_start_atom(p)) {
         Term *arg = parse_field(p);
         if (!arg) return NULL;
-        e = tm_app(e, arg);
+        e = tloc(tm_app(e, arg), e->loc);
     }
     return e;
 }
@@ -261,11 +335,11 @@ static Term *parse_field(Parser *p) {
     Term *e = parse_atom(p);
     if (!e) return NULL;
     while (at(p, T_DOT)) {
-        next(p);
+        Token dt = next(p);
         Token lt = peek(p);
         if (lt.type != T_NAME || is_keyword(lt.name)) { perr(p, lt.span, "expected label after '.'"); return NULL; }
         next(p);
-        e = tm_field(lt.name, e);
+        e = tloc(tm_field(lt.name, e), dt.span);
     }
     return e;
 }
@@ -273,11 +347,20 @@ static Term *parse_field(Parser *p) {
 static Term *parse_atom(Parser *p) {
     Token t = peek(p);
     switch (t.type) {
-    case T_NAT: next(p); return tm_nat(t.c.nat);
-    case T_INT: next(p); return tm_int(t.c.i64);
-    case T_DBL: next(p); return tm_dbl(t.c.dbl);
+    case T_NAT: next(p); return tloc(tm_nat(t.c.nat), t.span);
+    case T_INT: next(p); return tloc(tm_int(t.c.i64), t.span);
+    case T_DBL: next(p); return tloc(tm_dbl(t.c.dbl), t.span);
     case T_STR_OPEN: return parse_text(p);
     case T_LAMBDA: return parse_lambda(p);
+    case T_IMPORT: {
+        if (!p->loader) { perr(p, t.span, "imports are not available"); return NULL; }
+        next(p);
+        DhallError ie;
+        dhall_error_clear(&ie);
+        Term *r = import_resolve(p->loader, t.name, p, &ie);
+        if (!r) { ie.span = t.span; ie.has_span = (t.span.line > 0); p->err = ie; return NULL; }
+        return r;
+    }
     case T_LPAREN: {
         next(p);
         Term *e = parse_term(p);
@@ -290,14 +373,17 @@ static Term *parse_atom(Parser *p) {
     case T_LBRACKET: return parse_list(p);
     case T_NAME: {
         const char *s = t.name;
-        if (!strcmp(s, "True")) { next(p); return tm_bool(true); }
-        if (!strcmp(s, "False")) { next(p); return tm_bool(false); }
-        if (!strcmp(s, "Type")) { next(p); return tm_type(); }
-        if (!strcmp(s, "Kind")) { next(p); return tm_kind(); }
-        if (!strcmp(s, "Sort")) { next(p); return tm_sort(); }
-        if (builtin_type_schema(s) != NULL) { next(p); return tm_builtin(s); }
+        if (!strcmp(s, "True")) { next(p); return tloc(tm_bool(true), t.span); }
+        if (!strcmp(s, "False")) { next(p); return tloc(tm_bool(false), t.span); }
+        if (!strcmp(s, "Type")) { next(p); return tloc(tm_type(), t.span); }
+        if (!strcmp(s, "Kind")) { next(p); return tloc(tm_kind(), t.span); }
+        if (!strcmp(s, "Sort")) { next(p); return tloc(tm_sort(), t.span); }
+        if (!strcmp(s, "Some")) { next(p); Term *v = parse_field(p); if (!v) return NULL; return tloc(tm_some(v), t.span); }
+        if (!strcmp(s, "None")) { next(p); Term *ty = parse_field(p); if (!ty) return NULL; return tloc(tm_none(ty), t.span); }
+        if (!strcmp(s, "toMap")) { next(p); Term *r = parse_field(p); if (!r) return NULL; return tloc(tm_tomap(r), t.span); }
+        if (builtin_type_schema(s) != NULL) { next(p); return tloc(tm_builtin(s), t.span); }
         int idx = lookup_name(p, s);
-        if (idx >= 0) { next(p); return tm_var(idx); }
+        if (idx >= 0) { next(p); return tloc(tm_var(idx), t.span); }
         perr(p, t.span, "unbound variable '%s'", s);
         return NULL;
     }
@@ -383,15 +469,21 @@ static Term *parse_text(Parser *p) {
         open = true;
     }
     text_add_part(p, &buf, &open, &head, &tail);
-    if (!head) return tm_text_lit("");
-    return tm_text(head);
+    if (!head) return tloc(tm_text_lit(""), sp);
+    return tloc(tm_text(head), sp);
 }
 
 /* ---------- records ---------- */
 
 static Term *parse_record(Parser *p) {
+    SourceSpan sp = peek(p).span;
     next(p); /* { */
-    if (at(p, T_RBRACE)) { next(p); return tm_record_lit(NULL, 0); }
+    if (at(p, T_RBRACE)) { next(p); return tloc(tm_record_lit(NULL, 0), sp); }
+    if (at(p, T_EQUALS)) { /* {=} empty record literal */
+        next(p);
+        if (!expect(p, T_RBRACE, "'}' to close empty record literal")) return NULL;
+        return tloc(tm_record_lit(NULL, 0), sp);
+    }
 
     int cap = 4, n = 0;
     Field *fs = malloc(cap * sizeof(Field));
@@ -434,28 +526,30 @@ static Term *parse_record(Parser *p) {
     Field *af = arena_alloc(dhall_arena, n * sizeof(Field));
     memcpy(af, fs, n * sizeof(Field));
     free(fs);
-    return (first_sep == 1) ? tm_record_type(af, n) : tm_record_lit(af, n);
+    return tloc((first_sep == 1) ? tm_record_type(af, n) : tm_record_lit(af, n), sp);
 }
 
 /* ---------- unions ---------- */
 
 static Term *parse_union(Parser *p) {
+    SourceSpan sp = peek(p).span;
     next(p); /* < */
-    if (at(p, T_RANGLE)) { next(p); return tm_union_type(NULL, 0); }
+    if (at(p, T_RANGLE)) { next(p); return tloc(tm_union_type(NULL, 0), sp); }
 
+    p->union_depth++;
     int cap = 4, n = 0;
     Field *fs = malloc(cap * sizeof(Field));
     bool is_lit = false;
 
     for (;;) {
         Token nt = peek(p);
-        if (nt.type != T_NAME || is_keyword(nt.name)) { perr(p, nt.span, "expected union alternative label"); free(fs); return NULL; }
+        if (nt.type != T_NAME || is_keyword(nt.name)) { perr(p, nt.span, "expected union alternative label"); goto fail; }
         next(p);
         Token sep = peek(p);
         Term *ty = NULL, *val = NULL;
-        if (sep.type == T_COLON) { next(p); ty = parse_arrow(p); if (!ty) { free(fs); return NULL; } }
-        else if (sep.type == T_EQUALS) { is_lit = true; next(p); val = parse_term(p); if (!val) { free(fs); return NULL; } }
-        else { perr(p, sep.span, "expected ':' or '=' in union alternative"); free(fs); return NULL; }
+        if (sep.type == T_COLON) { next(p); ty = parse_arrow(p); if (!ty) goto fail; }
+        else if (sep.type == T_EQUALS) { is_lit = true; next(p); val = parse_term(p); if (!val) goto fail; }
+        else { perr(p, sep.span, "expected ':' or '=' in union alternative"); goto fail; }
 
         if (n == cap) { cap *= 2; fs = realloc(fs, cap * sizeof(Field)); }
         fs[n].label = nt.name;
@@ -466,32 +560,39 @@ static Term *parse_union(Parser *p) {
         if (at(p, T_BAR)) { next(p); continue; }
         break;
     }
-    if (!expect(p, T_RANGLE, "'>' to close union")) { free(fs); return NULL; }
+    if (!expect(p, T_RANGLE, "'>' to close union")) goto fail;
 
     if (is_lit) {
         int val_count = 0;
         for (int i = 0; i < n; i++) if (fs[i].value) val_count++;
-        if (val_count != 1) { perr(p, no_span(), "union literal must have exactly one alternative with a value"); free(fs); return NULL; }
+        if (val_count != 1) { perr(p, no_span(), "union literal must have exactly one alternative with a value"); goto fail; }
     }
 
     sort_fields(fs, n);
     for (int i = 1; i < n; i++)
         if (!strcmp(fs[i].label, fs[i - 1].label)) {
             perr(p, no_span(), "duplicate union alternative '%s'", fs[i].label);
-            free(fs); return NULL;
+            goto fail;
         }
 
     Field *af = arena_alloc(dhall_arena, n * sizeof(Field));
     memcpy(af, fs, n * sizeof(Field));
     free(fs);
-    return is_lit ? tm_union_lit(af, n) : tm_union_type(af, n);
+    p->union_depth--;
+    return tloc(is_lit ? tm_union_lit(af, n) : tm_union_type(af, n), sp);
+
+fail:
+    free(fs);
+    p->union_depth--;
+    return NULL;
 }
 
 /* ---------- lists ---------- */
 
 static Term *parse_list(Parser *p) {
+    SourceSpan sp = peek(p).span;
     next(p); /* [ */
-    if (at(p, T_RBRACKET)) { next(p); return tm_nil(); }
+    if (at(p, T_RBRACKET)) { next(p); return tloc(tm_nil(), sp); }
     int cap = 4, n = 0;
     Term **elems = malloc(cap * sizeof(Term *));
     for (;;) {
@@ -504,15 +605,15 @@ static Term *parse_list(Parser *p) {
     }
     if (!expect(p, T_RBRACKET, "']' to close list")) { free(elems); return NULL; }
     Term *out = tm_nil();
-    for (int i = n - 1; i >= 0; i--) out = tm_cons(elems[i], out);
+    for (int i = n - 1; i >= 0; i--) out = tloc(tm_cons(elems[i], out), elems[i]->loc);
     free(elems);
-    return out;
+    return tloc(out, sp);
 }
 
 /* ---------- entry ---------- */
 
-Term *parse_source(Parser *p, const char *src, DhallError *err) {
-    lexer_init(&p->lx, src);
+Term *parse_source(Parser *p, const char *src, const char *file, DhallError *err) {
+    lexer_init(&p->lx, src, file);
     p->nnames = 0;
     dhall_error_clear(&p->err);
     Term *t = parse_term(p);

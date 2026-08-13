@@ -2,11 +2,13 @@
 # test harness for the Dhall subset interpreter.
 # usage: tests/run.sh [dhall-binary]   (default: ./dhall.com.dbg)
 #
-# For each tests/cases/*.dhall:
+# For each tests/cases/*.dhall (stdin mode) and tests/cases/imports/*.dhall
+# (file mode, so relative imports resolve against the fixture dir):
 #   - typecheck is always run.
 #       *.expected.err   -> must FAIL (exit != 0) and stderr must contain this text
 #       (no *.expected.err) -> must SUCCEED (exit 0)
 #   - *.expected.nf      -> normalize must succeed and stdout must match
+#   - *.expected.nerr    -> normalize must FAIL and stderr must contain this text
 #   - *.expected.json    -> to-json must succeed and stdout must match
 #   - *.expected.jsonerr -> to-json must FAIL and stderr must contain this text
 set -u
@@ -22,13 +24,22 @@ ERR=/tmp/dhall-test-err.txt
 pass=0
 fail=0
 
-for f in cases/*.dhall; do
-    [ -e "$f" ] || continue
+# env value fixture for env: imports
+export DHALL_TEST_ENV=hello-world
+
+# check_one <file> <mode>   where mode = stdin | file
+check_one() {
+    f="$1"
+    mode="$2"
     base="${f%.dhall}"
     name="$(basename "$base")"
     ok=1
 
-    "$BIN" typecheck < "$f" >"$OUT" 2>"$ERR"
+    if [ "$mode" = file ]; then
+        "$BIN" typecheck "$f" >"$OUT" 2>"$ERR"
+    else
+        "$BIN" typecheck < "$f" >"$OUT" 2>"$ERR"
+    fi
     rc=$?
     if [ -f "$base.expected.err" ]; then
         want="$(cat "$base.expected.err")"
@@ -49,7 +60,11 @@ for f in cases/*.dhall; do
     fi
 
     if [ -f "$base.expected.nf" ]; then
-        "$BIN" normalize < "$f" >"$OUT" 2>"$ERR"
+        if [ "$mode" = file ]; then
+            "$BIN" normalize "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" normalize < "$f" >"$OUT" 2>"$ERR"
+        fi
         rc=$?
         if [ "$rc" -ne 0 ]; then
             echo "FAIL $name: normalize failed"
@@ -62,8 +77,30 @@ for f in cases/*.dhall; do
         fi
     fi
 
+    if [ -f "$base.expected.nerr" ]; then
+        if [ "$mode" = file ]; then
+            "$BIN" normalize "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" normalize < "$f" >"$OUT" 2>"$ERR"
+        fi
+        rc=$?
+        want="$(cat "$base.expected.nerr")"
+        if [ "$rc" -eq 0 ]; then
+            echo "FAIL $name: normalize should have failed"
+            ok=0
+        elif ! grep -F -q "$want" "$ERR"; then
+            echo "FAIL $name: normalize error mismatch (want: $want)"
+            cat "$ERR"
+            ok=0
+        fi
+    fi
+
     if [ -f "$base.expected.json" ]; then
-        "$BIN" to-json < "$f" >"$OUT" 2>"$ERR"
+        if [ "$mode" = file ]; then
+            "$BIN" to-json "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" to-json < "$f" >"$OUT" 2>"$ERR"
+        fi
         rc=$?
         if [ "$rc" -ne 0 ]; then
             echo "FAIL $name: to-json failed"
@@ -77,7 +114,11 @@ for f in cases/*.dhall; do
     fi
 
     if [ -f "$base.expected.jsonerr" ]; then
-        "$BIN" to-json < "$f" >"$OUT" 2>"$ERR"
+        if [ "$mode" = file ]; then
+            "$BIN" to-json "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" to-json < "$f" >"$OUT" 2>"$ERR"
+        fi
         rc=$?
         want="$(cat "$base.expected.jsonerr")"
         if [ "$rc" -eq 0 ]; then
@@ -96,6 +137,16 @@ for f in cases/*.dhall; do
     else
         fail=$((fail + 1))
     fi
+}
+
+for f in cases/*.dhall; do
+    [ -e "$f" ] || continue
+    check_one "$f" stdin
+done
+
+for f in cases/imports/*.dhall cases/imports/*/*.dhall; do
+    [ -e "$f" ] || continue
+    check_one "$f" file
 done
 
 echo

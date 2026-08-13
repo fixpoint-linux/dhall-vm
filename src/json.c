@@ -88,12 +88,19 @@ bool term_to_json(FILE *out, Term *t, DhallError *err) {
     case TmPi:
         if (err) { err->stage = ERR_JSON; snprintf(err->msg, sizeof(err->msg), "cannot serialize a function/Pi to JSON"); return false; }
         return false;
+    case TmSome:
+        /* Dhall: Some x serializes as the inner value */
+        return term_to_json(out, t->as.some.val, err);
+    case TmNone:
+        /* Dhall: None serializes as null */
+        fputs("null", out);
+        return true;
     case TmType: case TmKind: case TmSort:
         if (err) { err->stage = ERR_JSON; snprintf(err->msg, sizeof(err->msg), "cannot serialize a sort/type to JSON"); return false; }
         return false;
     case TmVar: case TmApp: case TmField: case TmMerge: case TmRecordType:
     case TmUnionType: case TmTextAppend: case TmLet: case TmIf: case TmAnn:
-    case TmBuiltin:
+    case TmBuiltin: case TmOp: case TmAssert: case TmToMap:
         if (err) { err->stage = ERR_JSON; snprintf(err->msg, sizeof(err->msg), "cannot serialize a non-value to JSON"); return false; }
         return false;
     }

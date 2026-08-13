@@ -71,6 +71,12 @@ Term *tm_union_type(Field *fs, int n)  { Term *t = mk(TmUnionType, SPAN_NONE); t
 Term *tm_union_lit(Field *fs, int n)   { Term *t = mk(TmUnionLit, SPAN_NONE); t->as.uni.fs = fs; t->as.uni.n = n; return t; }
 Term *tm_merge(Term *h, Term *u)       { Term *t = mk(TmMerge, SPAN_NONE); t->as.merge.handlers = h; t->as.merge.u = u; return t; }
 
+Term *tm_some(Term *v)  { Term *t = mk(TmSome, SPAN_NONE); t->as.some.val = v; return t; }
+Term *tm_none(Term *ty) { Term *t = mk(TmNone, SPAN_NONE); t->as.none.ty = ty; return t; }
+Term *tm_op(OpKind op, Term *l, Term *r) { Term *t = mk(TmOp, SPAN_NONE); t->as.op.op = op; t->as.op.lhs = l; t->as.op.rhs = r; return t; }
+Term *tm_assert(Term *b)  { Term *t = mk(TmAssert, SPAN_NONE); t->as.assert_.body = b; return t; }
+Term *tm_tomap(Term *r)   { Term *t = mk(TmToMap, SPAN_NONE); t->as.tomap.rec = r; return t; }
+
 Field *field_new(const char *label, Term *type, Term *value) {
     Field *f = arena_alloc(dhall_arena, sizeof(Field));
     f->label = arena_strdup(dhall_arena, label);
@@ -142,6 +148,11 @@ Term *shift(int d, int cutoff, Term *t) {
         return (t->tag == TmUnionType) ? tm_union_type(fs, t->as.uni.n) : tm_union_lit(fs, t->as.uni.n);
     }
     case TmMerge: return tm_merge(shift(d, cutoff, t->as.merge.handlers), shift(d, cutoff, t->as.merge.u));
+    case TmSome: return tm_some(shift(d, cutoff, t->as.some.val));
+    case TmNone: return tm_none(shift(d, cutoff, t->as.none.ty));
+    case TmOp:   return tm_op(t->as.op.op, shift(d, cutoff, t->as.op.lhs), shift(d, cutoff, t->as.op.rhs));
+    case TmAssert: return tm_assert(shift(d, cutoff, t->as.assert_.body));
+    case TmToMap:  return tm_tomap(shift(d, cutoff, t->as.tomap.rec));
     case TmConst: case TmType: case TmKind: case TmSort:
     case TmNil: case TmBuiltin: return t;
     }
@@ -203,6 +214,11 @@ Term *subst(int j, Term *s, Term *t) {
         return (t->tag == TmUnionType) ? tm_union_type(fs, t->as.uni.n) : tm_union_lit(fs, t->as.uni.n);
     }
     case TmMerge: return tm_merge(subst(j, s, t->as.merge.handlers), subst(j, s, t->as.merge.u));
+    case TmSome: return tm_some(subst(j, s, t->as.some.val));
+    case TmNone: return tm_none(subst(j, s, t->as.none.ty));
+    case TmOp:   return tm_op(t->as.op.op, subst(j, s, t->as.op.lhs), subst(j, s, t->as.op.rhs));
+    case TmAssert: return tm_assert(subst(j, s, t->as.assert_.body));
+    case TmToMap:  return tm_tomap(subst(j, s, t->as.tomap.rec));
     case TmConst: case TmType: case TmKind: case TmSort:
     case TmNil: case TmBuiltin: return t;
     }
@@ -269,6 +285,11 @@ bool alpha_eq(Term *a, Term *b) {
     case TmUnionType:
     case TmUnionLit: return fields_eq(a->as.uni.fs, a->as.uni.n, b->as.uni.fs, b->as.uni.n);
     case TmMerge: return alpha_eq(a->as.merge.handlers, b->as.merge.handlers) && alpha_eq(a->as.merge.u, b->as.merge.u);
+    case TmSome: return alpha_eq(a->as.some.val, b->as.some.val);
+    case TmNone: return alpha_eq(a->as.none.ty, b->as.none.ty);
+    case TmOp:   return a->as.op.op == b->as.op.op && alpha_eq(a->as.op.lhs, b->as.op.lhs) && alpha_eq(a->as.op.rhs, b->as.op.rhs);
+    case TmAssert: return alpha_eq(a->as.assert_.body, b->as.assert_.body);
+    case TmToMap:  return alpha_eq(a->as.tomap.rec, b->as.tomap.rec);
     }
     return false;
 }
@@ -288,6 +309,21 @@ static void print_text_lit(FILE *out, const char *s) {
         }
     }
     fputc('"', out);
+}
+
+static const char *op_str(OpKind op) {
+    switch (op) {
+    case OP_ADD: return "+";
+    case OP_SUB: return "-";
+    case OP_MUL: return "*";
+    case OP_LT: return "<";
+    case OP_LE: return "<=";
+    case OP_GT: return ">";
+    case OP_GE: return ">=";
+    case OP_EQ: return "==";
+    case OP_NE: return "!=";
+    }
+    return "?";
 }
 
 /* names for de Bruijn printing (lambda/pi) — synthetic */
@@ -395,5 +431,11 @@ void print_term(FILE *out, Term *t) {
     case TmMerge: { fputs("(merge ", out); print_term(out, t->as.merge.handlers); fputc(' ', out);
                     print_term(out, t->as.merge.u); fputc(')', out); break; }
     case TmBuiltin: fputs(t->as.bname, out); break;
+    case TmSome: { fputs("Some ", out); print_term(out, t->as.some.val); break; }
+    case TmNone: { fputs("None ", out); print_term(out, t->as.none.ty); break; }
+    case TmOp: { fputc('(', out); print_term(out, t->as.op.lhs); fprintf(out, " %s ", op_str(t->as.op.op));
+                 print_term(out, t->as.op.rhs); fputc(')', out); break; }
+    case TmAssert: { fputs("(assert : ", out); print_term(out, t->as.assert_.body); fputc(')', out); break; }
+    case TmToMap:  { fputs("(toMap ", out); print_term(out, t->as.tomap.rec); fputc(')', out); break; }
     }
 }

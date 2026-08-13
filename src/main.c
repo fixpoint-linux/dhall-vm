@@ -12,7 +12,7 @@ static char *read_all(FILE *f, size_t *len_out) {
     char *buf = malloc(cap);
     if (!buf) return NULL;
     for (;;) {
-        if (len == cap) { cap *= 2; buf = realloc(buf, cap); if (!buf) return NULL; }
+        if (len == cap) { cap *= 2; char *nb = realloc(buf, cap); if (!nb) { free(buf); return NULL; } buf = nb; }
         size_t n = fread(buf + len, 1, cap - len, f);
         len += n;
         if (n == 0) break;
@@ -24,8 +24,12 @@ static char *read_all(FILE *f, size_t *len_out) {
 
 static void print_error(const DhallError *e) {
     fprintf(stderr, "Error: %s", e->msg);
-    if (e->has_span)
-        fprintf(stderr, " (at line %d, col %d)", e->span.line, e->span.col);
+    if (e->has_span) {
+        if (e->span.file)
+            fprintf(stderr, " (at %s:%d:%d)", e->span.file, e->span.line, e->span.col);
+        else
+            fprintf(stderr, " (at line %d, col %d)", e->span.line, e->span.col);
+    }
     fputc('\n', stderr);
 }
 
@@ -46,6 +50,7 @@ int main(int argc, char **argv) {
     /* read input */
     FILE *in = stdin;
     bool close_in = false;
+    const char *src_file = NULL;
     if (argc >= 3 && strcmp(argv[2], "-") != 0) {
         in = fopen(argv[2], "rb");
         if (!in) {
@@ -53,44 +58,66 @@ int main(int argc, char **argv) {
             return 3;
         }
         close_in = true;
+        src_file = argv[2];
     }
     size_t src_len = 0;
     char *src = read_all(in, &src_len);
     if (close_in) fclose(in);
     if (!src) { fprintf(stderr, "Error: out of memory\n"); return 3; }
 
-    /* per-evaluation arena */
+    /* per-evaluation arena (reset ONCE; imported files allocate into it) */
     if (!dhall_arena) dhall_arena = arena_new();
     arena_reset(dhall_arena);
 
+    ImportLoader *loader = import_loader_new();
+    import_loader_push_root(loader, src_file);
+
     Parser p;
     memset(&p, 0, sizeof(p));
+    p.loader = loader;
     DhallError err;
     dhall_error_clear(&err);
 
-    Term *t = parse_source(&p, src, &err);
+    Term *t = parse_source(&p, src, src_file, &err);
     free(src);
-    if (!t) { print_error(&err); return dhall_error_exit(&err); }
+    if (!t) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
 
     if (want_typecheck) {
         Term *ty = infer_type(&p, t, &err);
-        if (!ty) { print_error(&err); return dhall_error_exit(&err); }
+        if (!ty) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
+        normalize_clear_error();
         Term *nty = normalize(ty);
+        if (normalize_has_error()) {
+            err = *normalize_get_error();
+            print_error(&err);
+            import_loader_free(loader);
+            return dhall_error_exit(&err);
+        }
         print_term(stdout, nty);
         fputc('\n', stdout);
+        import_loader_free(loader);
         return 0;
     }
 
+    normalize_clear_error();
     Term *nf = normalize(t);
+    if (normalize_has_error()) {
+        err = *normalize_get_error();
+        print_error(&err);
+        import_loader_free(loader);
+        return dhall_error_exit(&err);
+    }
 
     if (want_normalize) {
         print_term(stdout, nf);
         fputc('\n', stdout);
+        import_loader_free(loader);
         return 0;
     }
 
     /* to-json */
-    if (!term_to_json(stdout, nf, &err)) { print_error(&err); return dhall_error_exit(&err); }
+    if (!term_to_json(stdout, nf, &err)) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
     fputc('\n', stdout);
+    import_loader_free(loader);
     return 0;
 }

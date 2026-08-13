@@ -1,8 +1,9 @@
 /* typecheck.c — bidirectional infer/check over Terms.
    Adopts the verified de Bruijn infer/check from ref/proto.c VERBATIM
    and extends it for records, unions, merge, text interpolation,
-   Integer/Double, and annotated-lambda inference. Types are compared by
-   alphaEq(norm(a), norm(b)); dependent Pi substitution for application. */
+   Integer/Double, Optional/Some, arithmetic operators, assert, and toMap.
+   Types are compared by alphaEq(norm(a), norm(b)); dependent Pi
+   substitution for application. */
 #include "dhall.h"
 
 /* ---- context: growable stack of types, parallel names for diagnostics ---- */
@@ -81,6 +82,59 @@ static bool fields_label_sets_equal(Field *a, int na, Field *b, int nb) {
 static bool is_list_type(Term *t) {
     if (t->tag != TmApp) return false;
     return t->as.app.fn->tag == TmBuiltin && strcmp(t->as.app.fn->as.bname, "List") == 0;
+}
+
+static bool is_optional_type(Term *t) {
+    if (t->tag != TmApp) return false;
+    return t->as.app.fn->tag == TmBuiltin && strcmp(t->as.app.fn->as.bname, "Optional") == 0;
+}
+
+/* scalar-kind classification for binary operators; SC_NONE if not scalar */
+enum { SC_NONE = -1, SC_NAT, SC_INT, SC_DBL, SC_BOOL, SC_TEXT };
+static int scalar_kind(Term *ty) {
+    if (ty->tag == TmBuiltin) {
+        if (!strcmp(ty->as.bname, "Natural")) return SC_NAT;
+        if (!strcmp(ty->as.bname, "Integer")) return SC_INT;
+        if (!strcmp(ty->as.bname, "Double"))  return SC_DBL;
+        if (!strcmp(ty->as.bname, "Bool"))    return SC_BOOL;
+        if (!strcmp(ty->as.bname, "Text"))    return SC_TEXT;
+    }
+    return SC_NONE;
+}
+
+static Term *infer_binop(Ctx *g, Term *t, DhallError *err) {
+    Term *lty = infer(g, t->as.op.lhs, err);
+    if (!lty) return NULL;
+    Term *rty = infer(g, t->as.op.rhs, err);
+    if (!rty) return NULL;
+    Term *nl = normalize(lty);
+    Term *nr = normalize(rty);
+    if (!alpha_eq(nl, nr)) {
+        err_here(err, ERR_TYPE, t, "operands of different types");
+        return NULL;
+    }
+    int k = scalar_kind(nl);
+    OpKind op = t->as.op.op;
+    if (op == OP_ADD || op == OP_SUB || op == OP_MUL) {
+        if (k != SC_NAT && k != SC_INT && k != SC_DBL) {
+            err_here(err, ERR_TYPE, t, "arithmetic operator requires Natural/Integer/Double operands");
+            return NULL;
+        }
+        return nl;
+    }
+    if (op == OP_LT || op == OP_LE || op == OP_GT || op == OP_GE) {
+        if (k != SC_NAT && k != SC_INT && k != SC_DBL) {
+            err_here(err, ERR_TYPE, t, "comparison operator requires Natural/Integer/Double operands");
+            return NULL;
+        }
+        return tm_builtin("Bool");
+    }
+    /* OP_EQ / OP_NE */
+    if (k != SC_BOOL && k != SC_NAT && k != SC_INT && k != SC_DBL && k != SC_TEXT) {
+        err_here(err, ERR_TYPE, t, "equality operator does not support this type");
+        return NULL;
+    }
+    return tm_builtin("Bool");
 }
 
 static Term *infer(Ctx *g, Term *t, DhallError *err) {
@@ -285,6 +339,57 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
         if (!result) { err_here(err, ERR_TYPE, t, "merge of an empty union"); return NULL; }
         return result;
     }
+    case TmSome: {
+        Term *vty = infer(g, t->as.some.val, err);
+        if (!vty) return NULL;
+        return tm_app(tm_builtin("Optional"), vty);
+    }
+    case TmNone: {
+        Term *tty = infer(g, t->as.none.ty, err);
+        if (!tty) return NULL;
+        if (!is_sort(normalize(tty))) { err_here(err, ERR_TYPE, t, "None type argument is not a Type"); return NULL; }
+        return tm_app(tm_builtin("Optional"), t->as.none.ty);
+    }
+    case TmOp:
+        return infer_binop(g, t, err);
+    case TmAssert: {
+        Term *bty = infer(g, t->as.assert_.body, err);
+        if (!bty) return NULL;
+        if (!alpha_eq(normalize(bty), normalize(tm_builtin("Bool")))) {
+            err_here(err, ERR_TYPE, t, "assert is not a Bool");
+            return NULL;
+        }
+        Term *b = normalize(t->as.assert_.body);
+        if (!(b->tag == TmConst && b->as.c.kind == C_BOOL && b->as.c.b)) {
+            err_here(err, ERR_TYPE, t, "assertion did not hold");
+            return NULL;
+        }
+        return tm_builtin("Bool");
+    }
+    case TmToMap: {
+        Term *rty = infer(g, t->as.tomap.rec, err);
+        if (!rty) return NULL;
+        Term *nrt = normalize(rty);
+        if (nrt->tag != TmRecordType) { err_here(err, ERR_TYPE, t, "toMap argument is not a record"); return NULL; }
+        int n = nrt->as.rec.n;
+        if (n == 0) { err_here(err, ERR_TYPE, t, "toMap of an empty record"); return NULL; }
+        Term *T0 = normalize(nrt->as.rec.fs[0].type);
+        for (int i = 1; i < n; i++) {
+            if (!alpha_eq(T0, normalize(nrt->as.rec.fs[i].type))) {
+                err_here(err, ERR_TYPE, t, "toMap requires all record fields to have the same type");
+                return NULL;
+            }
+        }
+        Field *fs = arena_alloc(dhall_arena, 2 * sizeof(Field));
+        fs[0].label = arena_strdup(dhall_arena, "mapKey");
+        fs[0].type = tm_builtin("Text");
+        fs[0].value = NULL;
+        fs[1].label = arena_strdup(dhall_arena, "mapValue");
+        fs[1].type = T0;
+        fs[1].value = NULL;
+        Term *recTy = tm_record_type(fs, 2);
+        return tm_app(tm_builtin("List"), recTy);
+    }
     default:
         err_here(err, ERR_TYPE, t, "unsupported term in infer");
         return NULL;
@@ -307,6 +412,18 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
         return true;
     if (t->tag == TmCons && is_list_type(nty))
         return check(g, t->as.cons.head, nty->as.app.arg, err) && check(g, t->as.cons.tail, nty, err);
+    if (t->tag == TmSome && is_optional_type(nty))
+        return check(g, t->as.some.val, nty->as.app.arg, err);
+    if (t->tag == TmNone && is_optional_type(nty)) {
+        if (!alpha_eq(normalize(t->as.none.ty), normalize(nty->as.app.arg))) {
+            err_here(err, ERR_TYPE, t, "None type argument mismatch");
+            return false;
+        }
+        Term *tty = infer(g, t->as.none.ty, err);
+        if (!tty) return false;
+        if (!is_sort(normalize(tty))) { err_here(err, ERR_TYPE, t, "None type argument is not a Type"); return false; }
+        return true;
+    }
     if (t->tag == TmRecordLit && nty->tag == TmRecordType) {
         if (!fields_label_sets_equal(t->as.rec.fs, t->as.rec.n, nty->as.rec.fs, nty->as.rec.n)) {
             err_here(err, ERR_TYPE, t, "record literal labels do not match record type");
@@ -335,10 +452,15 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
 
 Term *infer_type(Parser *p, Term *t, DhallError *err) {
     (void)p;
+    normalize_clear_error();
     Ctx g;
     ctx_init(&g);
     Term *r = infer(&g, t, err);
     free(g.types);
     free(g.names);
+    if (normalize_has_error()) {
+        *err = *normalize_get_error();
+        return NULL;
+    }
     return r;
 }

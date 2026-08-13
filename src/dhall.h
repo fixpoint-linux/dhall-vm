@@ -39,9 +39,9 @@ extern Arena *dhall_arena;
 /* Source locations                                                    */
 /* ------------------------------------------------------------------ */
 
-typedef struct { int line, col; } SourceSpan;
+typedef struct { const char *file; int line, col; } SourceSpan;
 
-#define SPAN_NONE ((SourceSpan){ 0, 0 })
+#define SPAN_NONE ((SourceSpan){ NULL, 0, 0 })
 
 /* ------------------------------------------------------------------ */
 /* Term structure                                                      */
@@ -50,6 +50,8 @@ typedef struct { int line, col; } SourceSpan;
 typedef struct Term Term;
 typedef struct Field Field;
 typedef struct TextPart TextPart;
+typedef struct Parser Parser;
+typedef struct ImportLoader ImportLoader;
 
 typedef enum {
     C_NAT, C_INT, C_DBL, C_BOOL
@@ -62,6 +64,12 @@ typedef struct {
     double dbl;     /* C_DBL */
     bool b;         /* C_BOOL */
 } Const;
+
+/* binary operator kinds (TmOp) */
+typedef enum {
+    OP_ADD, OP_SUB, OP_MUL,
+    OP_LT, OP_LE, OP_GT, OP_GE, OP_EQ, OP_NE
+} OpKind;
 
 typedef enum {
     TmVar,          /* de Bruijn variable */
@@ -82,7 +90,12 @@ typedef enum {
     TmUnionType,    /* < A : T | B : U > */
     TmUnionLit,     /* < A = v | B : U > */
     TmMerge,        /* merge handlers u */
-    TmBuiltin       /* Natural/Bool/Text/List/List/map/... */
+    TmBuiltin,      /* Natural/Bool/Text/List/List/map/... */
+    TmSome,         /* Some x */
+    TmNone,         /* None T */
+    TmOp,           /* l + r, l == r, ... */
+    TmAssert,       /* assert : body */
+    TmToMap         /* toMap r */
 } TermTag;
 
 struct TextPart {
@@ -117,6 +130,11 @@ struct Term {
         struct { Field *fs; int n; } uni;     /* TmUnionType/TmUnionLit */
         struct { Term *handlers, *u; } merge; /* TmMerge */
         const char *bname;                    /* TmBuiltin */
+        struct { Term *val; } some;           /* TmSome */
+        struct { Term *ty; } none;            /* TmNone */
+        struct { OpKind op; Term *lhs, *rhs; } op; /* TmOp */
+        struct { Term *body; } assert_;       /* TmAssert */
+        struct { Term *rec; } tomap;          /* TmToMap */
     } as;
 };
 
@@ -170,6 +188,11 @@ Term *tm_union_type(Field *fs, int n);
 Term *tm_union_lit(Field *fs, int n);
 Term *tm_merge(Term *handlers, Term *u);
 Term *tm_builtin(const char *name);
+Term *tm_some(Term *val);
+Term *tm_none(Term *ty);
+Term *tm_op(OpKind op, Term *lhs, Term *rhs);
+Term *tm_assert(Term *body);
+Term *tm_tomap(Term *rec);
 
 Field *field_new(const char *label, Term *type, Term *value);
 Term *text_parts_single(const char *lit);   /* text with one literal part */
@@ -183,6 +206,7 @@ void print_term(FILE *out, Term *t);        /* pretty-print normal form */
 /* builtins.c — well-known builtins and their type schemas */
 bool builtin_is_type_name(const char *n);
 bool builtin_is_list(const char *n);
+bool builtin_is_keyword(const char *n);
 Term *builtin_type_schema(const char *name);   /* de Bruijn type schema; NULL if unknown */
 
 /* ------------------------------------------------------------------ */
@@ -197,6 +221,9 @@ typedef enum {
     T_LPAREN, T_RPAREN, T_LBRACE, T_RBRACE,
     T_LANGLE, T_RANGLE, T_LBRACKET, T_RBRACKET,
     T_PLUSPLUS, /* ++ */
+    T_PLUS, T_MINUS, T_STAR,
+    T_LT, T_LE, T_GT, T_GE, T_EQEQ, T_NE,
+    T_IMPORT,   /* ./path, ../path, /path, env:NAME */
     T_BAR,      /* | */
     T_ERROR
 } TokType;
@@ -205,19 +232,21 @@ typedef struct {
     TokType type;
     SourceSpan span;
     Const c;
-    char *name;         /* for T_NAME (arena) */
+    char *name;         /* for T_NAME and T_IMPORT spec (arena) */
 } Token;
 
 typedef struct {
     const char *src;
     size_t len, pos;
     int line, col;
+    const char *file;       /* source filename (NULL = unknown) */
+    bool after_operand;     /* did the last emitted token end a complete operand? */
     Token peeked;
     bool has_peek;
     DhallError err;
 } Lexer;
 
-void lexer_init(Lexer *lx, const char *src);
+void lexer_init(Lexer *lx, const char *src, const char *file);
 Token lexer_peek(Lexer *lx);
 Token lexer_next(Lexer *lx);
 int lexer_read_char(Lexer *lx);      /* raw next char, updates line/col; -1 at EOF */
@@ -226,27 +255,51 @@ SourceSpan lexer_here(Lexer *lx);    /* current position */
 bool lexer_eof(Lexer *lx);           /* next char is EOF */
 
 /* ------------------------------------------------------------------ */
+/* import.c — file/env import loader                                  */
+/* ------------------------------------------------------------------ */
+
+#define MAX_IMPORT_DEPTH 64   /* error (not crash) beyond this import-chain depth */
+
+ImportLoader *import_loader_new(void);
+void import_loader_free(ImportLoader *l);
+/* register the root file (or NULL for stdin) so relative imports resolve
+   against its directory and self-import is detected */
+void import_loader_push_root(ImportLoader *l, const char *root_file);
+/* resolve an import spec (./x, ../y, /abs, env:NAME) to a term.
+   On error sets *err and returns NULL. */
+Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *err);
+
+/* ------------------------------------------------------------------ */
 /* parser.c                                                           */
 /* ------------------------------------------------------------------ */
 
-typedef struct {
+struct Parser {
     Lexer lx;
     /* de Bruijn name resolution stack */
     const char **names;
     int nnames, namescap;
     int depth;              /* current parser recursion depth (DoS guard) */
+    int union_depth;        /* >0 while parsing a union alternative (no comparison) */
+    ImportLoader *loader;   /* import chain/cache/dir (NULL = no imports) */
     DhallError err;
-} Parser;
+};
 
 #define PARSE_MAX_DEPTH 1000   /* error (not crash) beyond this nesting depth */
 
-Term *parse_source(Parser *p, const char *src, DhallError *err);
+Term *parse_source(Parser *p, const char *src, const char *file, DhallError *err);
 
 /* ------------------------------------------------------------------ */
 /* normalize.c                                                        */
 /* ------------------------------------------------------------------ */
 
 Term *normalize(Term *t);
+
+/* overflow/error channel: normalize() has no out-param, so errors detected
+   during normalization (arithmetic overflow, Natural/fold limit) are recorded
+   in a module-global that callers clear before and check after. */
+void normalize_clear_error(void);
+bool normalize_has_error(void);
+DhallError *normalize_get_error(void);
 
 /* ------------------------------------------------------------------ */
 /* typecheck.c                                                        */

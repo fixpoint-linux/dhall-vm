@@ -1,24 +1,35 @@
 /* lexer.c — tokenizer for the Dhall subset. Produces tokens with source
    spans; skips whitespace and comments (-- line, {- -} nested block).
    Strings are not fully tokenized here — the parser drives raw-char
-   reading (via lexer_read_char/lexer_peek_char) to handle ${} nesting. */
+   reading (via lexer_read_char/lexer_peek_char) to handle ${} nesting.
+
+   Operator disambiguation:
+   - `+`/`-` are signed-literal prefixes only when NOT after a complete
+     operand (tracked via the after_operand flag); otherwise they are the
+     binary operators T_PLUS/T_MINUS.
+   - `<` is union-open (T_LANGLE) iff followed by NAME (: or = not ==),
+     else less-than (T_LT) — a bounded raw-char lookahead, restored after.
+   - `>` is always T_RANGLE; the parser disambiguates greater-than vs
+     union-closer positionally. */
 #include "dhall.h"
 #include <ctype.h>
 #include <errno.h>
 
 static int cur(Lexer *lx) { return lx->pos < lx->len ? (unsigned char)lx->src[lx->pos] : -1; }
 
-void lexer_init(Lexer *lx, const char *src) {
+void lexer_init(Lexer *lx, const char *src, const char *file) {
     lx->src = src;
     lx->len = strlen(src);
     lx->pos = 0;
     lx->line = 1;
     lx->col = 1;
+    lx->file = file;
+    lx->after_operand = false;
     lx->has_peek = false;
     dhall_error_clear(&lx->err);
 }
 
-SourceSpan lexer_here(Lexer *lx) { return (SourceSpan){ lx->line, lx->col }; }
+SourceSpan lexer_here(Lexer *lx) { return (SourceSpan){ lx->file, lx->line, lx->col }; }
 
 int lexer_read_char(Lexer *lx) {
     if (lx->pos >= lx->len) return -1;
@@ -53,14 +64,39 @@ static void skip_ws_and_comments(Lexer *lx) {
     }
 }
 
-static bool is_name_start(int c) { return isalpha(c) || c == '_'; }
-static bool is_name_char(int c) { return isalnum(c) || c == '_' || c == '-' || c == '\'' || c == '/'; }
+static bool is_name_start(int c) { return c != -1 && (isalpha(c) || c == '_'); }
+static bool is_name_char(int c) { return c != -1 && (isalnum(c) || c == '_' || c == '-' || c == '\'' || c == '/'); }
 
 static bool is_digit(int c) { return c >= '0' && c <= '9'; }
 
-static Token mk_tok(TokType t, SourceSpan sp) {
-    Token tok; tok.type = t; tok.span = sp; tok.name = NULL;
+static bool is_import_path_char(int c) {
+    if (c == -1) return false;
+    if (isalnum(c)) return true;
+    switch (c) { case '_': case '-': case '.': case '/': case '~': case '+': return true; }
+    return false;
+}
+
+/* does a token type end a complete operand? (for +/- signed-vs-binary) */
+static bool tok_ends_operand(TokType t, const char *name) {
+    switch (t) {
+    case T_NAT: case T_INT: case T_DBL:
+    case T_RPAREN: case T_RBRACKET: case T_RBRACE: case T_RANGLE:
+    case T_IMPORT:
+        return true;
+    case T_NAME:
+        return !builtin_is_keyword(name);
+    default:
+        return false;
+    }
+}
+
+static Token emit(Lexer *lx, TokType t, SourceSpan sp, const char *name) {
+    Token tok;
+    tok.type = t;
+    tok.span = sp;
+    tok.name = (char *)name;
     tok.c = (Const){ C_NAT, 0, 0, 0, false };
+    lx->after_operand = tok_ends_operand(t, name);
     return tok;
 }
 
@@ -71,13 +107,14 @@ static Token tokenize(Lexer *lx) {
     skip_ws_and_comments(lx);
     SourceSpan sp = lexer_here(lx);
     int c = cur(lx);
-    if (c == -1) return mk_tok(T_EOF, sp);
+    if (c == -1) return emit(lx, T_EOF, sp, NULL);
 
     /* string */
-    if (c == '"') { lexer_read_char(lx); return mk_tok(T_STR_OPEN, sp); }
+    if (c == '"') { lexer_read_char(lx); return emit(lx, T_STR_OPEN, sp, NULL); }
 
-    /* number: +n / -n / 0 -> Integer; digits -> Natural/Double */
-    if (is_digit(c) || ((c == '+' || c == '-') &&
+    /* number: +n / -n / 0 -> Integer; digits -> Natural/Double.
+       A +/- is a signed-literal prefix only when NOT after an operand. */
+    if (is_digit(c) || ((c == '+' || c == '-') && !lx->after_operand &&
                         lx->pos + 1 < lx->len && is_digit((unsigned char)lx->src[lx->pos + 1]))) {
         /* signed literal */
         if (c == '+' || c == '-') {
@@ -85,18 +122,18 @@ static Token tokenize(Lexer *lx) {
             if (!is_digit(cur(lx))) {
                 lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
                 snprintf(lx->err.msg, sizeof(lx->err.msg), "expected digits after sign");
-                return mk_tok(T_ERROR, sp);
+                return emit(lx, T_ERROR, sp, NULL);
             }
             Token t = tokenize(lx);
             if (t.type != T_NAT && t.type != T_DBL) {
                 lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
                 snprintf(lx->err.msg, sizeof(lx->err.msg), "expected number literal after sign");
-                return mk_tok(T_ERROR, sp);
+                return emit(lx, T_ERROR, sp, NULL);
             }
             if (t.type == T_DBL) {
-                Token r = mk_tok(T_DBL, sp);
                 double v = t.c.dbl;
                 if (c == '-') v = -v;
+                Token r = emit(lx, T_DBL, sp, NULL);
                 r.c = (Const){ C_DBL, 0, 0, v, false };
                 return r;
             }
@@ -107,19 +144,19 @@ static Token tokenize(Lexer *lx) {
                 if (mag > (uint64_t)INT64_MAX + 1u) {
                     lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
                     snprintf(lx->err.msg, sizeof(lx->err.msg), "Integer literal overflow");
-                    return mk_tok(T_ERROR, sp);
+                    return emit(lx, T_ERROR, sp, NULL);
                 }
                 int64_t v = (mag == (uint64_t)INT64_MAX + 1u) ? INT64_MIN : -(int64_t)mag;
-                Token r = mk_tok(T_INT, sp);
+                Token r = emit(lx, T_INT, sp, NULL);
                 r.c = (Const){ C_INT, 0, v, 0, false };
                 return r;
             } else {
                 if (mag > (uint64_t)INT64_MAX) {
                     lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
                     snprintf(lx->err.msg, sizeof(lx->err.msg), "Integer literal overflow");
-                    return mk_tok(T_ERROR, sp);
+                    return emit(lx, T_ERROR, sp, NULL);
                 }
-                Token r = mk_tok(T_INT, sp);
+                Token r = emit(lx, T_INT, sp, NULL);
                 r.c = (Const){ C_INT, 0, (int64_t)mag, 0, false };
                 return r;
             }
@@ -140,7 +177,7 @@ static Token tokenize(Lexer *lx) {
                 if (!is_digit(cur(lx))) {
                     lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
                     snprintf(lx->err.msg, sizeof(lx->err.msg), "malformed double literal");
-                    return mk_tok(T_ERROR, sp);
+                    return emit(lx, T_ERROR, sp, NULL);
                 }
                 while (is_digit(cur(lx))) lexer_read_char(lx);
             }
@@ -148,7 +185,7 @@ static Token tokenize(Lexer *lx) {
             char *end;
             errno = 0;
             double d = strtod(buf, &end);
-            Token t = mk_tok(T_DBL, sp);
+            Token t = emit(lx, T_DBL, sp, NULL);
             t.c = (Const){ C_DBL, 0, 0, d, false };
             return t;
         }
@@ -159,54 +196,100 @@ static Token tokenize(Lexer *lx) {
         if (errno == ERANGE) {
             lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
             snprintf(lx->err.msg, sizeof(lx->err.msg), "Natural literal overflow");
-            return mk_tok(T_ERROR, sp);
+            return emit(lx, T_ERROR, sp, NULL);
         }
-        Token t = mk_tok(T_NAT, sp);
+        Token t = emit(lx, T_NAT, sp, NULL);
         t.c = (Const){ C_NAT, (uint64_t)v, 0, 0, false };
         return t;
     }
 
-    /* identifier / keyword */
+    /* identifier / keyword (and env:NAME import) */
     if (is_name_start(c)) {
         size_t start = lx->pos;
         lexer_read_char(lx);
         while (is_name_char(cur(lx))) lexer_read_char(lx);
-        Token t = mk_tok(T_NAME, sp);
-        t.name = arena_strndup(dhall_arena, lx->src + start, lx->pos - start);
-        return t;
+        char *name = arena_strndup(dhall_arena, lx->src + start, lx->pos - start);
+        /* env:NAME import: 'env' immediately followed by ':' */
+        if (!strcmp(name, "env") && cur(lx) == ':') {
+            lexer_read_char(lx); /* ':' */
+            size_t s2 = lx->pos;
+            if (cur(lx) != -1 && (isalpha(cur(lx)) || cur(lx) == '_'))
+                while (cur(lx) != -1 && (isalnum(cur(lx)) || cur(lx) == '_')) lexer_read_char(lx);
+            size_t nlen = lx->pos - s2;
+            char *spec = arena_alloc(dhall_arena, 4 + nlen + 1);
+            memcpy(spec, "env:", 4);
+            memcpy(spec + 4, lx->src + s2, nlen);
+            spec[4 + nlen] = '\0';
+            return emit(lx, T_IMPORT, sp, spec);
+        }
+        return emit(lx, T_NAME, sp, name);
+    }
+
+    /* import path: ./ ../ /abs */
+    if (c == '/' ||
+        (c == '.' && lx->pos + 1 < lx->len && lx->src[lx->pos + 1] == '/') ||
+        (c == '.' && lx->pos + 2 < lx->len && lx->src[lx->pos + 1] == '.' && lx->src[lx->pos + 2] == '/')) {
+        size_t start = lx->pos;
+        while (is_import_path_char(cur(lx))) lexer_read_char(lx);
+        char *spec = arena_strndup(dhall_arena, lx->src + start, lx->pos - start);
+        return emit(lx, T_IMPORT, sp, spec);
     }
 
     /* symbols */
     lexer_read_char(lx);
     switch (c) {
-    case '\\': return mk_tok(T_LAMBDA, sp);
-    case ':': return mk_tok(T_COLON, sp);
-    case '=': return mk_tok(T_EQUALS, sp);
-    case ',': return mk_tok(T_COMMA, sp);
-    case '.': return mk_tok(T_DOT, sp);
-    case '(': return mk_tok(T_LPAREN, sp);
-    case ')': return mk_tok(T_RPAREN, sp);
-    case '{': return mk_tok(T_LBRACE, sp);
-    case '}': return mk_tok(T_RBRACE, sp);
-    case '<': return mk_tok(T_LANGLE, sp);
-    case '>': return mk_tok(T_RANGLE, sp);
-    case '[': return mk_tok(T_LBRACKET, sp);
-    case ']': return mk_tok(T_RBRACKET, sp);
-    case '|': return mk_tok(T_BAR, sp);
+    case '\\': return emit(lx, T_LAMBDA, sp, NULL);
+    case ':': return emit(lx, T_COLON, sp, NULL);
+    case '=':
+        if (cur(lx) == '=') { lexer_read_char(lx); return emit(lx, T_EQEQ, sp, NULL); }
+        return emit(lx, T_EQUALS, sp, NULL);
+    case ',': return emit(lx, T_COMMA, sp, NULL);
+    case '.': return emit(lx, T_DOT, sp, NULL);
+    case '(': return emit(lx, T_LPAREN, sp, NULL);
+    case ')': return emit(lx, T_RPAREN, sp, NULL);
+    case '{': return emit(lx, T_LBRACE, sp, NULL);
+    case '}': return emit(lx, T_RBRACE, sp, NULL);
+    case '<': {
+        if (cur(lx) == '=') { lexer_read_char(lx); return emit(lx, T_LE, sp, NULL); }
+        /* bounded lookahead: union-open iff < (ws) NAME (ws) (: or = not ==) */
+        size_t save_pos = lx->pos;
+        int save_line = lx->line, save_col = lx->col;
+        while (cur(lx) == ' ' || cur(lx) == '\t' || cur(lx) == '\r' || cur(lx) == '\n')
+            lexer_read_char(lx);
+        bool is_union = false;
+        if (is_name_start(cur(lx))) {
+            while (is_name_char(cur(lx))) lexer_read_char(lx);
+            while (cur(lx) == ' ' || cur(lx) == '\t' || cur(lx) == '\r' || cur(lx) == '\n')
+                lexer_read_char(lx);
+            if (cur(lx) == ':' ||
+                (cur(lx) == '=' && (lx->pos + 1 >= lx->len || lx->src[lx->pos + 1] != '=')))
+                is_union = true;
+        }
+        lx->pos = save_pos; lx->line = save_line; lx->col = save_col;
+        return emit(lx, is_union ? T_LANGLE : T_LT, sp, NULL);
+    }
+    case '>':
+        if (cur(lx) == '=') { lexer_read_char(lx); return emit(lx, T_GE, sp, NULL); }
+        return emit(lx, T_RANGLE, sp, NULL);
+    case '[': return emit(lx, T_LBRACKET, sp, NULL);
+    case ']': return emit(lx, T_RBRACKET, sp, NULL);
+    case '|': return emit(lx, T_BAR, sp, NULL);
+    case '*': return emit(lx, T_STAR, sp, NULL);
     case '+':
-        if (cur(lx) == '+') { lexer_read_char(lx); return mk_tok(T_PLUSPLUS, sp); }
-        lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
-        snprintf(lx->err.msg, sizeof(lx->err.msg), "unexpected '+'");
-        return mk_tok(T_ERROR, sp);
+        if (cur(lx) == '+') { lexer_read_char(lx); return emit(lx, T_PLUSPLUS, sp, NULL); }
+        return emit(lx, T_PLUS, sp, NULL);
     case '-':
-        if (cur(lx) == '>') { lexer_read_char(lx); return mk_tok(T_ARROW, sp); }
+        if (cur(lx) == '>') { lexer_read_char(lx); return emit(lx, T_ARROW, sp, NULL); }
+        return emit(lx, T_MINUS, sp, NULL);
+    case '!':
+        if (cur(lx) == '=') { lexer_read_char(lx); return emit(lx, T_NE, sp, NULL); }
         lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
-        snprintf(lx->err.msg, sizeof(lx->err.msg), "unexpected '-'");
-        return mk_tok(T_ERROR, sp);
+        snprintf(lx->err.msg, sizeof(lx->err.msg), "unexpected '!'");
+        return emit(lx, T_ERROR, sp, NULL);
     default:
         lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
         snprintf(lx->err.msg, sizeof(lx->err.msg), "unexpected character '%c'", c);
-        return mk_tok(T_ERROR, sp);
+        return emit(lx, T_ERROR, sp, NULL);
     }
 }
 

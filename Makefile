@@ -1,7 +1,7 @@
 CC := cosmocc
 CFLAGS := -std=c11 -O2 -g -Wall -Wextra
 SRC := src/main.c src/arena.c src/lexer.c src/parser.c src/ast.c \
-       src/normalize.c src/typecheck.c src/builtins.c src/json.c
+       src/normalize.c src/typecheck.c src/builtins.c src/json.c src/import.c
 HDR := src/dhall.h
 
 .PHONY: all test clean
