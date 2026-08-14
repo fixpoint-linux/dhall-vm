@@ -1,0 +1,1 @@
+{a:Natural}/\{a:Bool}

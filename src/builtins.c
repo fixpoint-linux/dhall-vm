@@ -21,7 +21,8 @@ bool builtin_is_keyword(const char *n) {
     return !strcmp(n, "let") || !strcmp(n, "in") || !strcmp(n, "if") ||
            !strcmp(n, "then") || !strcmp(n, "else") || !strcmp(n, "merge") ||
            !strcmp(n, "forall") || !strcmp(n, "assert") ||
-           !strcmp(n, "Some") || !strcmp(n, "None") || !strcmp(n, "toMap");
+           !strcmp(n, "Some") || !strcmp(n, "None") || !strcmp(n, "toMap") ||
+           !strcmp(n, "with");
 }
 
 /* type constant terms */
@@ -96,5 +97,11 @@ Term *builtin_type_schema(const char *n) {
     if (!strcmp(n, "Natural/isZero")) return tm_pi(nat(), tm_builtin("Bool"));
     if (!strcmp(n, "Natural/show"))   return tm_pi(nat(), tm_builtin("Text"));
     if (!strcmp(n, "Natural/subtract")) return tm_pi(nat(), tm_pi(nat(), nat()));
+    if (!strcmp(n, "Natural/even"))      return tm_pi(nat(), builtin_bool());
+    if (!strcmp(n, "Natural/odd"))       return tm_pi(nat(), builtin_bool());
+    if (!strcmp(n, "Natural/toInteger")) return tm_pi(nat(), builtin_int());
+    if (!strcmp(n, "Integer/toDouble"))  return tm_pi(builtin_int(), builtin_dbl());
+    if (!strcmp(n, "Text/replace"))      return tm_pi(builtin_text(), tm_pi(builtin_text(), tm_pi(builtin_text(), builtin_text())));
+    if (!strcmp(n, "List/length"))       return tm_pi(tm_type(), tm_pi(tm_app(builtin_list(), tm_var(0)), nat()));
     return NULL;
 }

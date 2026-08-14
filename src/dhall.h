@@ -95,7 +95,9 @@ typedef enum {
     TmNone,         /* None T */
     TmOp,           /* l + r, l == r, ... */
     TmAssert,       /* assert : body */
-    TmToMap         /* toMap r */
+    TmToMap,        /* toMap r */
+    TmCombine,      /* l /\ r  (recursive record merge) */
+    TmWith          /* r with a.b = v  (record update) */
 } TermTag;
 
 struct TextPart {
@@ -135,6 +137,8 @@ struct Term {
         struct { OpKind op; Term *lhs, *rhs; } op; /* TmOp */
         struct { Term *body; } assert_;       /* TmAssert */
         struct { Term *rec; } tomap;          /* TmToMap */
+        struct { Term *lhs, *rhs; } combine;  /* TmCombine */
+        struct { Term *rec; char **path; int npath; Term *value; } with_; /* TmWith */
     } as;
 };
 
@@ -193,6 +197,8 @@ Term *tm_none(Term *ty);
 Term *tm_op(OpKind op, Term *lhs, Term *rhs);
 Term *tm_assert(Term *body);
 Term *tm_tomap(Term *rec);
+Term *tm_combine(Term *lhs, Term *rhs);
+Term *tm_with(Term *rec, char **path, int npath, Term *value);
 
 Field *field_new(const char *label, Term *type, Term *value);
 Term *text_parts_single(const char *lit);   /* text with one literal part */
@@ -225,6 +231,7 @@ typedef enum {
     T_LT, T_LE, T_GT, T_GE, T_EQEQ, T_NE,
     T_IMPORT,   /* ./path, ../path, /path, env:NAME */
     T_BAR,      /* | */
+    T_MERGE,    /* /\ */
     T_ERROR
 } TokType;
 

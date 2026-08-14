@@ -35,14 +35,17 @@ bidirectional typechecking) includes:
 - **Binders** — `let`, lambdas (`\(x : T) -> body`), `forall`/Pi,
   annotations (`e : T`), `if/then/else`.
 - **Records** — record types `{ a : T }`, record literals `{ a = v }`,
-  field access, `toMap`.
+  field access, `toMap`, recursive record merge (`/\`), and `with` record
+  update.
 - **Lists** — `[a, b, c]`, `List/map`, `List/filter`, `List/reverse`,
-  `List/fold`.
+  `List/fold`, `List/length`.
 - **Unions** — `< A : T | B : U >` and `< A = v | B : U >`, `merge`.
 - **Optionals** — `Optional T`, `Some x`, `None T`, `Optional/fold`.
 - **Arithmetic** — `+ - *` and comparisons `== != < <= > >=` over
   `Natural`/`Integer`/`Double` (equality also over `Bool`/`Text`), plus
-  `Natural/isZero`, `Natural/show`, `Natural/subtract`, `Natural/fold`.
+  `Natural/isZero`, `Natural/show`, `Natural/subtract`, `Natural/fold`,
+  `Natural/even`, `Natural/odd`, `Natural/toInteger`, `Integer/toDouble`,
+  `Text/replace`.
 - **Assertions** — `assert : body` where `body : Bool` and normalizes to
   `True`. Note: the assertion is enforced during `typecheck`; the
   `normalize` and serializer (`to-json`/`to-toml`/`to-yaml`) modes do not
@@ -60,8 +63,14 @@ bidirectional typechecking) includes:
   normalization); `Integer` `+ - *` overflow via built-in checked
   arithmetic. `Double` is IEEE 754 (JSON maps non-finite to `null`).
 - Division is intentionally **not** supported (no `/` operator).
-- Operator precedence (loosest to tightest): `->`, `:`, comparisons,
-  `+ - ++`, `*`, application.
+- Operator precedence (loosest to tightest): `->`, `:`, `with`, comparisons,
+  `+ - ++`, `/\`, `*`, application.
+- `/\` is a **recursive** record merge: disjoint fields are kept, shared
+  fields are recursively merged. A shared field that is not a record on both
+  sides is a *type error* (faithful Dhall); the right-biased override is the
+  separate `//` operator, which is not supported.
+- `with` both updates (a field's type may change) and inserts fields, and
+  creates intermediate records for nested paths (`e with a.b = v`).
 - `Natural/subtract a b` is `max (b - a) 0` — the argument order is the
   opposite of the `-` operator.
 - `Natural/fold` is capped at `2^20` iterations (DoS guard).

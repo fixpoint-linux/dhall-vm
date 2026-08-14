@@ -111,6 +111,7 @@ static Value *term_to_value(Term *t, SerFormat fmt, DhallError *err) {
     case TmVar: case TmApp: case TmField: case TmMerge: case TmRecordType:
     case TmUnionType: case TmTextAppend: case TmLet: case TmIf: case TmAnn:
     case TmBuiltin: case TmOp: case TmAssert: case TmToMap:
+    case TmCombine: case TmWith:
         if (err) dhall_error_set(err, ERR_SERIALIZE, SPAN_NONE, "cannot serialize a non-value to %s", format_name(fmt));
         return NULL;
     }

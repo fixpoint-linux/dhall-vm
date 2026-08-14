@@ -4,8 +4,8 @@
    interpolation via raw-char reading with recursive expression parsing.
 
    Precedence (loosest→tightest):
-     ->  <  :  <  comparison(== != < <= > >=)  <  additive(+ - ++)
-        <  multiplicative(*)  <  application
+     ->  <  :  <  with  <  comparison(== != < <= > >=)  <  additive(+ - ++)
+        <  /\  <  multiplicative(*)  <  application
    Every constructed term's .loc is stamped (tloc) from the current token
    so type errors report file:line:col. Imports are inlined at parse time
    (no TmImport tag survives; the loader lives in Parser.loader). */
@@ -82,8 +82,10 @@ static Term *parse_arrow(Parser *p);
 static Term *parse_annotation(Parser *p);
 static Term *parse_comparison(Parser *p);
 static Term *parse_additive(Parser *p);
+static Term *parse_combine(Parser *p);
 static Term *parse_multiplicative(Parser *p);
 static Term *parse_merge(Parser *p);
+static Term *parse_with(Parser *p);
 static Term *parse_application(Parser *p);
 static Term *parse_field(Parser *p);
 static Term *parse_atom(Parser *p);
@@ -240,7 +242,7 @@ static Term *parse_arrow(Parser *p) {
 }
 
 static Term *parse_annotation(Parser *p) {
-    Term *e = parse_comparison(p);
+    Term *e = parse_with(p);
     if (!e) return NULL;
     if (at(p, T_COLON)) {
         Token cn = next(p);
@@ -274,26 +276,39 @@ static Term *parse_comparison(Parser *p) {
 }
 
 static Term *parse_additive(Parser *p) {
-    Term *left = parse_multiplicative(p);
+    Term *left = parse_combine(p);
     if (!left) return NULL;
     for (;;) {
         Token op_tk = peek(p);
         if (op_tk.type == T_PLUS) {
             next(p);
-            Term *r = parse_multiplicative(p);
+            Term *r = parse_combine(p);
             if (!r) return NULL;
             left = tloc(tm_op(OP_ADD, left, r), op_tk.span);
         } else if (op_tk.type == T_MINUS) {
             next(p);
-            Term *r = parse_multiplicative(p);
+            Term *r = parse_combine(p);
             if (!r) return NULL;
             left = tloc(tm_op(OP_SUB, left, r), op_tk.span);
         } else if (op_tk.type == T_PLUSPLUS) {
             next(p);
-            Term *r = parse_multiplicative(p);
+            Term *r = parse_combine(p);
             if (!r) return NULL;
             left = tloc(tm_append(left, r), op_tk.span);
         } else break;
+    }
+    return left;
+}
+
+/* record merge /\ — TIGHTER than + - ++, LOOSER than *; left-associative */
+static Term *parse_combine(Parser *p) {
+    Term *left = parse_multiplicative(p);
+    if (!left) return NULL;
+    while (at(p, T_MERGE)) {
+        Token op_tk = next(p);
+        Term *r = parse_multiplicative(p);
+        if (!r) return NULL;
+        left = tloc(tm_combine(left, r), op_tk.span);
     }
     return left;
 }
@@ -320,6 +335,47 @@ static Term *parse_merge(Parser *p) {
         return tloc(tm_merge(h, u), mt.span);
     }
     return parse_application(p);
+}
+
+/* with-expression: e with a.b.c = v  (RHS is an operator-expression = below
+   :/->, so `e with a = v : T` annotates the WHOLE with; the while-loop chains
+   greedily, so `e with a = x with b = 1` = `(e with a = x) with b = 1`). */
+static Term *parse_with(Parser *p) {
+    Term *e = parse_comparison(p);
+    if (!e) return NULL;
+    while (at_name(p, "with")) {
+        Token wt = next(p); /* with */
+        int cap = 4, n = 0;
+        const char **labels = malloc(cap * sizeof(char *));
+        Token first = peek(p);
+        if (first.type != T_NAME || is_keyword(first.name)) {
+            perr(p, first.span, "expected field path after 'with'");
+            free(labels);
+            return NULL;
+        }
+        next(p);
+        labels[n++] = first.name;
+        while (at(p, T_DOT)) {
+            next(p);
+            Token lt = peek(p);
+            if (lt.type != T_NAME || is_keyword(lt.name)) {
+                perr(p, lt.span, "expected label after '.' in with path");
+                free(labels);
+                return NULL;
+            }
+            next(p);
+            if (n == cap) { cap *= 2; labels = realloc(labels, cap * sizeof(char *)); }
+            labels[n++] = lt.name;
+        }
+        if (!expect(p, T_EQUALS, "'=' in with expression")) { free(labels); return NULL; }
+        Term *v = parse_comparison(p);
+        if (!v) { free(labels); return NULL; }
+        char **path = arena_alloc(dhall_arena, (size_t)n * sizeof(char *));
+        for (int i = 0; i < n; i++) path[i] = arena_strdup(dhall_arena, labels[i]);
+        free(labels);
+        e = tloc(tm_with(e, path, n, v), wt.span);
+    }
+    return e;
 }
 
 static Term *parse_application(Parser *p) {

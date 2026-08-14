@@ -76,6 +76,15 @@ Term *tm_none(Term *ty) { Term *t = mk(TmNone, SPAN_NONE); t->as.none.ty = ty; r
 Term *tm_op(OpKind op, Term *l, Term *r) { Term *t = mk(TmOp, SPAN_NONE); t->as.op.op = op; t->as.op.lhs = l; t->as.op.rhs = r; return t; }
 Term *tm_assert(Term *b)  { Term *t = mk(TmAssert, SPAN_NONE); t->as.assert_.body = b; return t; }
 Term *tm_tomap(Term *r)   { Term *t = mk(TmToMap, SPAN_NONE); t->as.tomap.rec = r; return t; }
+Term *tm_combine(Term *l, Term *r) { Term *t = mk(TmCombine, SPAN_NONE); t->as.combine.lhs = l; t->as.combine.rhs = r; return t; }
+Term *tm_with(Term *rec, char **path, int npath, Term *value) {
+    Term *t = mk(TmWith, SPAN_NONE);
+    t->as.with_.rec = rec;
+    t->as.with_.path = path;
+    t->as.with_.npath = npath;
+    t->as.with_.value = value;
+    return t;
+}
 
 Field *field_new(const char *label, Term *type, Term *value) {
     Field *f = arena_alloc(dhall_arena, sizeof(Field));
@@ -153,6 +162,9 @@ Term *shift(int d, int cutoff, Term *t) {
     case TmOp:   return tm_op(t->as.op.op, shift(d, cutoff, t->as.op.lhs), shift(d, cutoff, t->as.op.rhs));
     case TmAssert: return tm_assert(shift(d, cutoff, t->as.assert_.body));
     case TmToMap:  return tm_tomap(shift(d, cutoff, t->as.tomap.rec));
+    case TmCombine: return tm_combine(shift(d, cutoff, t->as.combine.lhs), shift(d, cutoff, t->as.combine.rhs));
+    case TmWith:    return tm_with(shift(d, cutoff, t->as.with_.rec), t->as.with_.path,
+                                   t->as.with_.npath, shift(d, cutoff, t->as.with_.value));
     case TmConst: case TmType: case TmKind: case TmSort:
     case TmNil: case TmBuiltin: return t;
     }
@@ -219,6 +231,9 @@ Term *subst(int j, Term *s, Term *t) {
     case TmOp:   return tm_op(t->as.op.op, subst(j, s, t->as.op.lhs), subst(j, s, t->as.op.rhs));
     case TmAssert: return tm_assert(subst(j, s, t->as.assert_.body));
     case TmToMap:  return tm_tomap(subst(j, s, t->as.tomap.rec));
+    case TmCombine: return tm_combine(subst(j, s, t->as.combine.lhs), subst(j, s, t->as.combine.rhs));
+    case TmWith:    return tm_with(subst(j, s, t->as.with_.rec), t->as.with_.path,
+                                   t->as.with_.npath, subst(j, s, t->as.with_.value));
     case TmConst: case TmType: case TmKind: case TmSort:
     case TmNil: case TmBuiltin: return t;
     }
@@ -290,6 +305,13 @@ bool alpha_eq(Term *a, Term *b) {
     case TmOp:   return a->as.op.op == b->as.op.op && alpha_eq(a->as.op.lhs, b->as.op.lhs) && alpha_eq(a->as.op.rhs, b->as.op.rhs);
     case TmAssert: return alpha_eq(a->as.assert_.body, b->as.assert_.body);
     case TmToMap:  return alpha_eq(a->as.tomap.rec, b->as.tomap.rec);
+    case TmCombine: return alpha_eq(a->as.combine.lhs, b->as.combine.lhs) && alpha_eq(a->as.combine.rhs, b->as.combine.rhs);
+    case TmWith: {
+        if (a->as.with_.npath != b->as.with_.npath) return false;
+        for (int i = 0; i < a->as.with_.npath; i++)
+            if (strcmp(a->as.with_.path[i], b->as.with_.path[i]) != 0) return false;
+        return alpha_eq(a->as.with_.rec, b->as.with_.rec) && alpha_eq(a->as.with_.value, b->as.with_.value);
+    }
     }
     return false;
 }
@@ -443,5 +465,13 @@ void print_term(FILE *out, Term *t) {
                  print_term(out, t->as.op.rhs); fputc(')', out); break; }
     case TmAssert: { fputs("(assert : ", out); print_term(out, t->as.assert_.body); fputc(')', out); break; }
     case TmToMap:  { fputs("(toMap ", out); print_term(out, t->as.tomap.rec); fputc(')', out); break; }
+    case TmCombine: { fputc('(', out); print_term(out, t->as.combine.lhs); fputs(" /\\ ", out);
+                      print_term(out, t->as.combine.rhs); fputc(')', out); break; }
+    case TmWith: { fputc('(', out); print_term(out, t->as.with_.rec); fputs(" with ", out);
+                   for (int i = 0; i < t->as.with_.npath; i++) {
+                       if (i) fputc('.', out);
+                       fputs(t->as.with_.path[i], out);
+                   }
+                   fputs(" = ", out); print_term(out, t->as.with_.value); fputc(')', out); break; }
     }
 }

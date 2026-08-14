@@ -137,6 +137,94 @@ static Term *infer_binop(Ctx *g, Term *t, DhallError *err) {
     return tm_builtin("Bool");
 }
 
+/* recursive merge of two record TYPES. A shared field must recursively be a
+   record type, else this is a type error (the faithful Dhall rule — the
+   right-biased OVERRIDE is the separate // operator, out of scope). */
+static Term *merge_record_types(Term *l, Term *r, Term *loc, DhallError *err) {
+    Field *lfs = l->as.rec.fs; int ln = l->as.rec.n;
+    Field *rfs = r->as.rec.fs; int rn = r->as.rec.n;
+    Field *out = arena_alloc(dhall_arena, (size_t)(ln + rn) * sizeof(Field));
+    int n = 0, i = 0, j = 0;
+    while (i < ln || j < rn) {
+        int cmp;
+        if (i >= ln) cmp = 1;
+        else if (j >= rn) cmp = -1;
+        else cmp = strcmp(lfs[i].label, rfs[j].label);
+        if (cmp < 0) { out[n++] = lfs[i++]; }
+        else if (cmp > 0) { out[n++] = rfs[j++]; }
+        else {
+            Term *lt = normalize(lfs[i].type);
+            Term *rt = normalize(rfs[j].type);
+            if (lt->tag == TmRecordType && rt->tag == TmRecordType) {
+                out[n].label = lfs[i].label;
+                out[n].type = merge_record_types(lt, rt, loc, err);
+                out[n].value = NULL;
+                if (!out[n].type) return NULL;
+            } else {
+                err_here(err, ERR_TYPE, loc, "shared field '%s' is not a record type", lfs[i].label);
+                return NULL;
+            }
+            n++; i++; j++;
+        }
+    }
+    return tm_record_type(out, n);
+}
+
+/* insert field k : vty into a record TYPE, keeping labels sorted */
+static Term *insert_field_type(Term *rty, const char *k, Term *vty) {
+    Field *fs = arena_alloc(dhall_arena, (size_t)(rty->as.rec.n + 1) * sizeof(Field));
+    int out = 0;
+    bool inserted = false;
+    for (int j = 0; j < rty->as.rec.n; j++) {
+        if (!inserted && strcmp(rty->as.rec.fs[j].label, k) > 0) {
+            fs[out].label = arena_strdup(dhall_arena, k);
+            fs[out].type = vty;
+            fs[out].value = NULL;
+            out++;
+            inserted = true;
+        }
+        fs[out++] = rty->as.rec.fs[j];
+    }
+    if (!inserted) {
+        fs[out].label = arena_strdup(dhall_arena, k);
+        fs[out].type = vty;
+        fs[out].value = NULL;
+        out++;
+    }
+    return tm_record_type(fs, out);
+}
+
+/* mirror of normalize's with_update_lit, but over record TYPES: compute the
+   type of `rec with path = v` given rec's type rty and v's type vty. */
+static Term *with_type_at(Term *rty, char **path, int n, Term *vty, Term *loc, DhallError *err) {
+    if (n == 0) return vty;
+    const char *k = path[0];
+    int i = field_find(rty->as.rec.fs, rty->as.rec.n, k);
+    if (i >= 0) {
+        if (n == 1) {
+            Field *fs = arena_alloc(dhall_arena, (size_t)rty->as.rec.n * sizeof(Field));
+            memcpy(fs, rty->as.rec.fs, (size_t)rty->as.rec.n * sizeof(Field));
+            fs[i].type = vty;
+            return tm_record_type(fs, rty->as.rec.n);
+        }
+        Term *ft = normalize(rty->as.rec.fs[i].type);
+        if (ft->tag != TmRecordType) {
+            err_here(err, ERR_TYPE, loc, "cannot descend into non-record field '%s'", k);
+            return NULL;
+        }
+        Term *sub = with_type_at(ft, path + 1, n - 1, vty, loc, err);
+        if (!sub) return NULL;
+        Field *fs = arena_alloc(dhall_arena, (size_t)rty->as.rec.n * sizeof(Field));
+        memcpy(fs, rty->as.rec.fs, (size_t)rty->as.rec.n * sizeof(Field));
+        fs[i].type = sub;
+        return tm_record_type(fs, rty->as.rec.n);
+    }
+    if (n == 1) return insert_field_type(rty, k, vty);
+    Term *sub = with_type_at(tm_record_type(NULL, 0), path + 1, n - 1, vty, loc, err);
+    if (!sub) return NULL;
+    return insert_field_type(rty, k, sub);
+}
+
 static Term *infer(Ctx *g, Term *t, DhallError *err) {
     switch (t->tag) {
     case TmVar: {
@@ -391,6 +479,38 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
         fs[1].value = NULL;
         Term *recTy = tm_record_type(fs, 2);
         return tm_app(tm_builtin("List"), recTy);
+    }
+    case TmCombine: {
+        Term *nl = normalize(t->as.combine.lhs);
+        Term *nr = normalize(t->as.combine.rhs);
+        if (nl->tag == TmRecordType && nr->tag == TmRecordType) {
+            /* type-level merge: both operands are record types */
+            if (!merge_record_types(nl, nr, t, err)) return NULL;
+            return tm_type();
+        }
+        Term *lty = infer(g, t->as.combine.lhs, err);
+        if (!lty) return NULL;
+        Term *rty = infer(g, t->as.combine.rhs, err);
+        if (!rty) return NULL;
+        Term *nlt = normalize(lty);
+        Term *nrt = normalize(rty);
+        if (nlt->tag != TmRecordType || nrt->tag != TmRecordType) {
+            err_here(err, ERR_TYPE, t, "record merge operand is not a record");
+            return NULL;
+        }
+        return merge_record_types(nlt, nrt, t, err);
+    }
+    case TmWith: {
+        Term *rty = infer(g, t->as.with_.rec, err);
+        if (!rty) return NULL;
+        Term *nr = normalize(rty);
+        if (nr->tag != TmRecordType) {
+            err_here(err, ERR_TYPE, t, "with target is not a record");
+            return NULL;
+        }
+        Term *vty = infer(g, t->as.with_.value, err);
+        if (!vty) return NULL;
+        return with_type_at(nr, t->as.with_.path, t->as.with_.npath, vty, t, err);
     }
     default:
         err_here(err, ERR_TYPE, t, "unsupported term in infer");

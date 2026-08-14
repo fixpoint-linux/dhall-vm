@@ -101,7 +101,11 @@ static bool tok_ends_operand(TokType t, const char *name) {
     case T_IMPORT: case T_STR_OPEN:
         return true;
     case T_NAME:
-        return !builtin_is_keyword(name);
+        /* A keyword never ends an operand, and a builtin (a function value)
+           never does either — it is awaiting an application argument, so a
+           following +/- is a signed literal (e.g. `Integer/toDouble +3`).
+           Only a plain variable denotes a complete operand. */
+        return !builtin_is_keyword(name) && builtin_type_schema(name) == NULL;
     default:
         return false;
     }
@@ -243,6 +247,15 @@ static Token tokenize(Lexer *lx) {
             return emit(lx, T_IMPORT, sp, spec);
         }
         return emit(lx, T_NAME, sp, name);
+    }
+
+    /* record merge operator /\ — must be recognized BEFORE the import-path
+       branch below, which would otherwise lex the bare '/' as an absolute
+       import path. */
+    if (c == '/' && lx->pos + 1 < lx->len && lx->src[lx->pos + 1] == '\\') {
+        lexer_read_char(lx);
+        lexer_read_char(lx);
+        return emit(lx, T_MERGE, sp, NULL);
     }
 
     /* import path: ./ ../ /abs */

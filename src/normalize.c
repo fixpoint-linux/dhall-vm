@@ -276,6 +276,134 @@ static Term *norm_op(Term *t) {
     return tm_op(op, l, r); /* stuck */
 }
 
+/* binary search in a sorted Field array (mirrors typecheck.c field_find) */
+static int nfield_find(Field *fs, int n, const char *label) {
+    int lo = 0, hi = n - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        int c = strcmp(fs[mid].label, label);
+        if (c == 0) return mid;
+        else if (c < 0) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
+}
+
+/* ---- record merge /\ ---- */
+
+static Term *norm_combine(Term *l, Term *r);
+static Term *merge_record_lits_norm(Term *l, Term *r);
+static Term *merge_record_types_norm(Term *l, Term *r);
+
+static Term *merge_record_lits_norm(Term *l, Term *r) {
+    Field *lfs = l->as.rec.fs; int ln = l->as.rec.n;
+    Field *rfs = r->as.rec.fs; int rn = r->as.rec.n;
+    Field *out = arena_alloc(dhall_arena, (size_t)(ln + rn) * sizeof(Field));
+    int n = 0, i = 0, j = 0;
+    while (i < ln || j < rn) {
+        int cmp;
+        if (i >= ln) cmp = 1;
+        else if (j >= rn) cmp = -1;
+        else cmp = strcmp(lfs[i].label, rfs[j].label);
+        if (cmp < 0) { out[n++] = lfs[i++]; }
+        else if (cmp > 0) { out[n++] = rfs[j++]; }
+        else {
+            out[n].label = lfs[i].label;
+            out[n].type = NULL;
+            out[n].value = norm_combine(lfs[i].value, rfs[j].value);
+            n++; i++; j++;
+        }
+    }
+    return tm_record_lit(out, n);
+}
+
+static Term *merge_record_types_norm(Term *l, Term *r) {
+    Field *lfs = l->as.rec.fs; int ln = l->as.rec.n;
+    Field *rfs = r->as.rec.fs; int rn = r->as.rec.n;
+    Field *out = arena_alloc(dhall_arena, (size_t)(ln + rn) * sizeof(Field));
+    int n = 0, i = 0, j = 0;
+    while (i < ln || j < rn) {
+        int cmp;
+        if (i >= ln) cmp = 1;
+        else if (j >= rn) cmp = -1;
+        else cmp = strcmp(lfs[i].label, rfs[j].label);
+        if (cmp < 0) { out[n++] = lfs[i++]; }
+        else if (cmp > 0) { out[n++] = rfs[j++]; }
+        else {
+            out[n].label = lfs[i].label;
+            out[n].type = norm_combine(lfs[i].type, rfs[j].type);
+            out[n].value = NULL;
+            n++; i++; j++;
+        }
+    }
+    return tm_record_type(out, n);
+}
+
+static Term *norm_combine(Term *l, Term *r) {
+    Term *l2 = normalize(l);
+    Term *r2 = normalize(r);
+    if (l2->tag == TmRecordLit && r2->tag == TmRecordLit)
+        return merge_record_lits_norm(l2, r2);
+    if (l2->tag == TmRecordType && r2->tag == TmRecordType)
+        return merge_record_types_norm(l2, r2);
+    return tm_combine(l2, r2); /* stuck */
+}
+
+/* ---- with record update ---- */
+
+static Term *insert_field_lit(Term *rec, const char *k, Term *v) {
+    Field *fs = arena_alloc(dhall_arena, (size_t)(rec->as.rec.n + 1) * sizeof(Field));
+    int out = 0;
+    bool inserted = false;
+    for (int j = 0; j < rec->as.rec.n; j++) {
+        if (!inserted && strcmp(rec->as.rec.fs[j].label, k) > 0) {
+            fs[out].label = arena_strdup(dhall_arena, k);
+            fs[out].type = NULL;
+            fs[out].value = v;
+            out++;
+            inserted = true;
+        }
+        fs[out++] = rec->as.rec.fs[j];
+    }
+    if (!inserted) {
+        fs[out].label = arena_strdup(dhall_arena, k);
+        fs[out].type = NULL;
+        fs[out].value = v;
+        out++;
+    }
+    return tm_record_lit(fs, out);
+}
+
+static Term *update_field_lit(Term *rec, int i, Term *v) {
+    Field *fs = arena_alloc(dhall_arena, (size_t)rec->as.rec.n * sizeof(Field));
+    memcpy(fs, rec->as.rec.fs, (size_t)rec->as.rec.n * sizeof(Field));
+    fs[i].value = v;
+    return tm_record_lit(fs, rec->as.rec.n);
+}
+
+static Term *with_update_lit(Term *rec, char **path, int n, Term *v) {
+    const char *k = path[0];
+    int i = nfield_find(rec->as.rec.fs, rec->as.rec.n, k);
+    if (i >= 0) {
+        if (n == 1) return update_field_lit(rec, i, v);
+        Term *sub = rec->as.rec.fs[i].value;
+        Term *newsub = (sub->tag == TmRecordLit)
+            ? with_update_lit(sub, path + 1, n - 1, v)
+            : tm_with(sub, path + 1, n - 1, v);
+        return update_field_lit(rec, i, newsub);
+    }
+    if (n == 1) return insert_field_lit(rec, k, v);
+    Term *sub = with_update_lit(tm_record_lit(NULL, 0), path + 1, n - 1, v);
+    return insert_field_lit(rec, k, sub);
+}
+
+static Term *norm_with(Term *t) {
+    Term *r = normalize(t->as.with_.rec);
+    Term *v = normalize(t->as.with_.value);
+    if (r->tag != TmRecordLit) return tm_with(r, t->as.with_.path, t->as.with_.npath, v);
+    return with_update_lit(r, t->as.with_.path, t->as.with_.npath, v);
+}
+
 Term *normalize(Term *t) {
     switch (t->tag) {
     case TmVar: case TmConst: case TmType: case TmKind: case TmSort:
@@ -383,6 +511,61 @@ Term *normalize(Term *t) {
                 b->tag == TmConst && b->as.c.kind == C_NAT)
                 return tm_nat(b->as.c.nat < a->as.c.nat ? 0 : b->as.c.nat - a->as.c.nat);
         }
+        if (match_builtin("Natural/even", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_NAT)
+                return tm_bool(n->as.c.nat % 2 == 0);
+        }
+        if (match_builtin("Natural/odd", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_NAT)
+                return tm_bool(n->as.c.nat % 2 == 1);
+        }
+        if (match_builtin("Natural/toInteger", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_NAT) {
+                if (n->as.c.nat > (uint64_t)INT64_MAX) {
+                    norm_set_error(t->loc, "Natural/toInteger overflow");
+                    return t; /* stuck */
+                }
+                return tm_int((int64_t)n->as.c.nat);
+            }
+        }
+        if (match_builtin("Integer/toDouble", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_INT)
+                return tm_dbl((double)n->as.c.i64);
+        }
+        if (match_builtin("Text/replace", 3, t, args)) {
+            Term *needle = normalize(args[0]);
+            Term *repl = normalize(args[1]);
+            Term *hay = normalize(args[2]);
+            if (needle->tag == TmText && !text_has_interp(needle) &&
+                repl->tag == TmText && !text_has_interp(repl) &&
+                hay->tag == TmText && !text_has_interp(hay)) {
+                const char *nd = needle->as.text->lit;
+                const char *rp = repl->as.text->lit;
+                const char *hs = hay->as.text->lit;
+                size_t ndlen = strlen(nd);
+                if (ndlen == 0) return tm_text_lit(hs); /* guard: no infinite loop */
+                TmpBuf buf; tmpbuf_init(&buf);
+                const char *cur = hs;
+                for (;;) {
+                    const char *found = strstr(cur, nd);
+                    if (!found) { tmpbuf_add(&buf, cur); break; }
+                    for (const char *q = cur; q < found; q++) tmpbuf_addc(&buf, *q);
+                    tmpbuf_add(&buf, rp);
+                    cur = found + ndlen;
+                }
+                return tm_text_lit(tmpbuf_arena(dhall_arena, &buf));
+            }
+        }
+        if (match_builtin("List/length", 2, t, args)) {
+            Term *xs = normalize(args[1]);
+            uint64_t count = 0;
+            for (Term *cur = xs; cur->tag == TmCons; cur = cur->as.cons.tail) count++;
+            return tm_nat(count);
+        }
         Term *f = normalize(t->as.app.fn);
         if (f->tag == TmLam) return normalize(subst(0, t->as.app.arg, f->as.lam.body));
         return tm_app(f, normalize(t->as.app.arg));
@@ -438,6 +621,8 @@ Term *normalize(Term *t) {
         return tm_assert(b); /* stuck / non-Bool body: keep the assert */
     }
     case TmToMap: return norm_tomap(t);
+    case TmCombine: return norm_combine(t->as.combine.lhs, t->as.combine.rhs);
+    case TmWith: return norm_with(t);
     }
     return t;
 }
