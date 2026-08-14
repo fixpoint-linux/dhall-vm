@@ -122,6 +122,10 @@ as a de Bruijn reference, not an ordinary identifier. `_` alone and
 and is bounds-checked; an out-of-range or overflowing `_N` is a parse error
 (`invalid de Bruijn index`).
 
+`forall` is accepted in type positions (lambda parameter types, let
+annotations, record/union field types), so higher-order normal forms — e.g.
+`\(_ : forall (_ : Natural) -> Natural) -> _0` — also round-trip.
+
 ## Known limitation: stuck text interpolation
 
 `normalize` and `to-json` modes reject interpolation of a **closed non-Text**

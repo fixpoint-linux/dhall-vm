@@ -63,10 +63,7 @@ check_one() {
 
 check_one curried-id     '\(x : Natural) -> \(y : Natural) -> x'
 check_one single-lambda  '\(x : Natural) -> x'
-# NB: higher-order terms (binder whose type is a Pi, e.g. '\(f : Natural -> Natural) -> f')
-# are NOT included: the printer emits such binder types as 'forall (...)' which this
-# parser does not accept (it only parses '->' for Pi) -- a pre-existing printer/parser
-# asymmetry unrelated to the '_N' de Bruijn round-trip fix.
+check_one higher-order   '\(f : Natural -> Natural) -> f'
 check_one let-lambda     'let f = \(x : Natural) -> x in f'
 check_one nested-3       '\(a : Natural) -> \(b : Natural) -> \(c : Natural) -> b'
 check_one lambda-under-ann '\(x : Natural) -> \(y : Natural) -> y'

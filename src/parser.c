@@ -404,6 +404,7 @@ static Term *parse_atom(Parser *p) {
         }
         if (!strcmp(s, "True")) { next(p); return tloc(tm_bool(true), t.span); }
         if (!strcmp(s, "False")) { next(p); return tloc(tm_bool(false), t.span); }
+        if (!strcmp(s, "forall")) return parse_forall(p);
         if (!strcmp(s, "Type")) { next(p); return tloc(tm_type(), t.span); }
         if (!strcmp(s, "Kind")) { next(p); return tloc(tm_kind(), t.span); }
         if (!strcmp(s, "Sort")) { next(p); return tloc(tm_sort(), t.span); }
