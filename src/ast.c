@@ -296,8 +296,7 @@ bool alpha_eq(Term *a, Term *b) {
 
 /* ---------------- pretty-printer (normal form) ---------------- */
 
-static void print_text_lit(FILE *out, const char *s) {
-    fputc('"', out);
+static void print_text_escaped(FILE *out, const char *s) {
     for (const char *p = s; *p; p++) {
         switch (*p) {
         case '"': fputs("\\\"", out); break;
@@ -308,7 +307,6 @@ static void print_text_lit(FILE *out, const char *s) {
         default: fputc(*p, out); break;
         }
     }
-    fputc('"', out);
 }
 
 static const char *op_str(OpKind op) {
@@ -393,11 +391,19 @@ void print_term(FILE *out, Term *t) {
         case C_BOOL: fputs(t->as.c.b ? "True" : "False", out); break;
         }
         break;
-    case TmText:
-        if (t->as.text && !t->as.text->expr)
-            print_text_lit(out, t->as.text->lit);
-        else fputs("\"<interpolated>\"", out);
+    case TmText: {
+        fputc('"', out);
+        for (TextPart *p = t->as.text; p; p = p->next) {
+            if (p->lit) print_text_escaped(out, p->lit);
+            else if (p->expr) {
+                fputs("${", out);
+                print_term(out, p->expr);
+                fputc('}', out);
+            }
+        }
+        fputc('"', out);
         break;
+    }
     case TmType: fputs("Type", out); break;
     case TmKind: fputs("Kind", out); break;
     case TmSort: fputs("Sort", out); break;

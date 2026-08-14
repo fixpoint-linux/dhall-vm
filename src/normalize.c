@@ -91,28 +91,62 @@ static bool is_closed_nontext_value(Term *e) {
     }
 }
 
-/* concatenate all parts into one arena string. interpolations must have
-   normalized to plain text literals (guaranteed for well-typed input). */
-static char *text_concat(Term *t) {
-    TmpBuf b;
-    tmpbuf_init(&b);
-    for (TextPart *p = t->as.text; p; p = p->next) {
-        if (p->lit) tmpbuf_add(&b, p->lit);
-        else if (p->expr) {
-            Term *e = normalize(p->expr);
-            if (e->tag == TmText && e->as.text && !e->as.text->expr && e->as.text->lit)
-                tmpbuf_add(&b, e->as.text->lit);
-            else if (is_closed_nontext_value(e))
-                norm_set_error(p->expr->loc, "interpolation requires Text");
-        }
-    }
-    return tmpbuf_arena(dhall_arena, &b);
-}
-
-/* normalize a text term: collapse interpolation into a single literal */
+/* normalize a text term by PARTIAL SPLICE: rebuild the TextPart list where
+   each interpolation part is spliced into the literal stream iff it
+   normalizes to a closed Text literal, errors iff it normalizes to a closed
+   non-Text value, and is otherwise PRESERVED as an (already-normalized)
+   expression part (stuck terms: TmVar, TmApp, ...). Adjacent literal chunks
+   are coalesced, so a fully-collapsed text becomes a single literal part. */
 static Term *norm_text(Term *t) {
     if (!text_has_interp(t)) return t;
-    return tm_text_lit(text_concat(t));
+
+    TmpBuf lit; tmpbuf_init(&lit);
+    bool have_lit = false;
+    TextPart *head = NULL, *tail = NULL;
+    bool any_expr = false;
+
+    for (TextPart *p = t->as.text; p; p = p->next) {
+        if (p->lit) {
+            tmpbuf_add(&lit, p->lit);
+            have_lit = true;
+        } else if (p->expr) {
+            Term *e = normalize(p->expr);
+            if (e->tag == TmText && e->as.text && !e->as.text->expr && e->as.text->lit) {
+                tmpbuf_add(&lit, e->as.text->lit);   /* splice closed Text literal */
+                have_lit = true;
+            } else if (is_closed_nontext_value(e)) {
+                norm_set_error(p->expr->loc, "interpolation requires Text");
+            } else {
+                /* preserve the stuck (already-normalized) interpolation expr */
+                if (have_lit) {
+                    TextPart *np = arena_alloc(dhall_arena, sizeof(TextPart));
+                    np->lit = tmpbuf_arena(dhall_arena, &lit);
+                    np->expr = NULL; np->next = NULL;
+                    if (tail) tail->next = np; else head = np;
+                    tail = np;
+                    have_lit = false;
+                }
+                TextPart *np = arena_alloc(dhall_arena, sizeof(TextPart));
+                np->lit = NULL;
+                np->expr = e;
+                np->next = NULL;
+                if (tail) tail->next = np; else head = np;
+                tail = np;
+                any_expr = true;
+            }
+        }
+    }
+
+    if (!any_expr)
+        return tm_text_lit(have_lit ? tmpbuf_arena(dhall_arena, &lit) : "");
+
+    if (have_lit) {
+        TextPart *np = arena_alloc(dhall_arena, sizeof(TextPart));
+        np->lit = tmpbuf_arena(dhall_arena, &lit);
+        np->expr = NULL; np->next = NULL;
+        if (tail) tail->next = np; else head = np;
+    }
+    return tm_text(head);
 }
 
 static Term *norm_field(Term *t) {

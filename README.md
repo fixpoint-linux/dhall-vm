@@ -128,15 +128,15 @@ and is bounds-checked; an out-of-range or overflowing `_N` is a parse error
 annotations, record/union field types), so higher-order normal forms — e.g.
 `\(_ : forall (_ : Natural) -> Natural) -> _0` — also round-trip.
 
-## Known limitation: stuck text interpolation
+## Stuck text interpolation (preserved, not dropped)
 
 `normalize` and the serializer (`to-json`/`to-toml`/`to-yaml`) modes reject
-interpolation of a **closed non-Text** value (e.g. `"${1+2}"` or `"${True}"`) with `interpolation requires Text`. However,
-a **stuck** interpolation whose value is a bound variable of type Text (e.g.
-`\(x : Text) -> "${x}"`) is still silently dropped, producing `\(_ : Text) -> ""`.
-This is a known limitation (a faithful fix would require preserving interpolated
-sub-terms through normalization and printing them back as `"${_0}"`), and is
-deliberately out of scope for this subset interpreter.
+interpolation of a **closed non-Text** value (e.g. `"${1+2}"` or `"${True}"`)
+with `interpolation requires Text`. A **stuck** interpolation whose value is a
+bound variable of type Text is now **preserved** rather than dropped: e.g.
+`\(x : Text) -> "${x}"` normalizes to `\(_ : Text) -> "${_0}"` (which re-parses,
+type-checks, and is idempotent). Well-typed closed interpolation still collapses
+(`let x = "hi" in "say ${x}"` to `"say hi"`).
 
 ## Recursion depth
 

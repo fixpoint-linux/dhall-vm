@@ -1,0 +1,30 @@
+/* artifact-2: src/ast.c — TWO edits.
+   EDIT 1: replace print_text_lit body with this quote-free helper (and REMOVE
+   the old print_text_lit entirely; it is now unused -> -Wunused-function). */
+static void print_text_escaped(FILE *out, const char *s) {
+    for (const char *p = s; *p; p++) {
+        switch (*p) {
+        case '"': fputs("\\\"", out); break;
+        case '\\': fputs("\\\\", out); break;
+        case '\n': fputs("\\n", out); break;
+        case '\t': fputs("\\t", out); break;
+        case '\r': fputs("\\r", out); break;
+        default: fputc(*p, out); break;
+        }
+    }
+}
+
+/* EDIT 2: replace the print_term TmText case with this. */
+    case TmText: {
+        fputc('"', out);
+        for (TextPart *p = t->as.text; p; p = p->next) {
+            if (p->lit) print_text_escaped(out, p->lit);
+            else if (p->expr) {
+                fputs("${", out);
+                print_term(out, p->expr);
+                fputc('}', out);
+            }
+        }
+        fputc('"', out);
+        break;
+    }

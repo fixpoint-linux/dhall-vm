@@ -6,35 +6,22 @@ future fix can be scoped precisely.
 
 ## 1. Stuck (bound-variable) text interpolation is silently dropped
 
-**Status:** known / accepted (out of scope). Not fixed.
+**Status:** FIXED.
 
-**Symptom:**
-```
-\(x : Text) -> "${x}"
-```
-normalizes to
-```
-\(_ : Text) -> ""
-```
-(exit 0) — the interpolated expression `x` is *silently dropped*, producing a
-**wrong** normal form. This is distinct from the (fixed) closed non-Text case:
-`"${1+2}"` now errors with `interpolation requires Text`, but a **stuck** (bound
-Text) interpolation is still dropped to the empty string.
+**Symptom (before the fix):** `\(x : Text) -> "${x}"` normalized to
+`\(_ : Text) -> ""` (exit 0) - the interpolated expression `x` was silently
+dropped, producing a **wrong** normal form. (This was distinct from the closed
+non-Text case `"${1+2}"`, which has always errored with
+`interpolation requires Text`.)
 
-**Root cause:** in `src/normalize.c`, `text_concat()` concatenates interpolation
-parts only when the normalized part is already a pure `Text` literal
-(`TmText` with a literal, no `expr`). Any part that does not normalize to a
-pure literal is skipped, so a bound `Text` variable (which normalizes to a
-`TmVar`, not a literal) is dropped.
-
-**Scope of a correct fix (deliberately NOT attempted):** proper *partial splice*
-— rebuild the `TextPart` list keeping non-literal interpolation parts intact
-instead of dropping them, and make `print_term` / `serialize.c` emit preserved
-interpolation (e.g. `"${_0}"`). That bleeds into the `_N` round-trip machinery
-and is a larger, riskier change.
-
-**Why not error on all non-literal interpolations instead?** Because that would
-wrongly reject the (valid, correct) `\(x : Text) -> "${x}"`. The distinction is:
-`"${1+2}"` is ill-typed (non-Text value), while `"${x}"` with `x : Text` is
-well-typed but "stuck" at normalize time (its value isn't known without
-substitution — which here substitutes under a binder and stays symbolic).
+**What changed:** `src/normalize.c` now does a *partial splice* in `norm_text()`:
+it rebuilds the TextPart list, splicing an interpolation part into the literal
+stream only when it normalizes to a closed `Text` literal, erroring (as before)
+when it normalizes to a closed non-`Text` value (`interpolation requires Text`),
+and otherwise preserving the (already-normalized) stuck expression as an `expr`
+part. `src/ast.c` `print_term`'s `TmText` case now emits those preserved parts
+back as `${...}` (e.g. `"${_0}"`), which re-parse via the existing `_N` de Bruijn
+machinery. So `\(x : Text) -> "${x}"` now normalizes to `\(_ : Text) -> "${_0}"`
+(idempotent, round-trips). Closed non-Text interpolation (`"${1+2}"`) still
+errors, and well-typed closed interpolation (`let x = "hi" in "say ${x}"`) still
+collapses to `"say hi"`.

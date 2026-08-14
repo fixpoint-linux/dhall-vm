@@ -67,6 +67,9 @@ check_one higher-order   '\(f : Natural -> Natural) -> f'
 check_one let-lambda     'let f = \(x : Natural) -> x in f'
 check_one nested-3       '\(a : Natural) -> \(b : Natural) -> \(c : Natural) -> b'
 check_one lambda-under-ann '\(x : Natural) -> \(y : Natural) -> y'
+check_one stuck-interp       '\(x : Text) -> "${x}"'
+check_one stuck-interp-mixed '\(x : Text) -> "a${x}b"'
+check_one stuck-interp-multi '\(x : Text) -> \(y : Text) -> "a${x}b${y}c"'
 
 echo
 echo "=== $pass passed, $fail failed ==="
