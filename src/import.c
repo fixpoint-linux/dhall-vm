@@ -1,8 +1,16 @@
 /* import.c — file/env import loader with cycle detection, a per-canonical-path
    term cache, and an import-chain depth guard.
 
-   Scope: local file imports (./x, ../y, /abs) and env:NAME (resolved to a Text
-   literal via getenv). NO network/URL/missing/sha256 imports.
+   Scope: local file imports (./x, ../y, /abs), env:NAME (resolved to a Text
+   literal via getenv), the always-absent `missing` import, and a sha256:<hex>
+   integrity check. NO network/URL imports.
+
+   DEVIATION from real Dhall: the sha256:<hex> hash is computed over the RAW
+   SOURCE TEXT (file bytes / env-var value), NOT the CBOR encoding of the
+   beta-normal form (this subset has no CBOR). The hash is lowercase base16
+   hex (64 chars), not base64. A hash mismatch is a HARD error (ERR_IO, not
+   recoverable by `?`); an ABSENT import (`missing`, file-not-found, env-unset)
+   is reported with stage ERR_MISSING, which the parser's `?` catches.
 
    Imports are inlined AT PARSE TIME: import_resolve() parses the referenced
    file with a FRESH name stack (imports are closed — no outer-binder access)
@@ -100,16 +108,32 @@ void import_loader_push_root(ImportLoader *l, const char *root_file) {
     l->dirs[l->dn++] = xstrdup(".");
 }
 
-Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *err) {
+Term *import_resolve(ImportLoader *l, const char *spec, const char *hash_hex,
+                     Parser *p, DhallError *err) {
     dhall_error_clear(err);
+
+    /* `missing` import: always absent (no cache lookup; any hash ignored). */
+    if (strcmp(spec, "missing") == 0) {
+        dhall_error_set(err, ERR_MISSING, SPAN_NONE, "missing import");
+        return NULL;
+    }
 
     /* env:NAME -> Text literal (value NOT parsed as Dhall source) */
     if (strncmp(spec, "env:", 4) == 0) {
         const char *name = spec + 4;
         const char *val = getenv(name);
         if (!val) {
-            dhall_error_set(err, ERR_IO, SPAN_NONE, "environment variable '%s' not set", name);
+            dhall_error_set(err, ERR_MISSING, SPAN_NONE, "environment variable '%s' not set", name);
             return NULL;
+        }
+        if (hash_hex) {
+            char got[65];
+            sha256_hex(val, strlen(val), got);
+            if (strcmp(got, hash_hex) != 0) {
+                dhall_error_set(err, ERR_IO, SPAN_NONE,
+                                "sha256 mismatch for 'env:%s'", name);
+                return NULL;
+            }
         }
         return tm_text_lit(val);
     }
@@ -120,7 +144,7 @@ Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *e
     if (!path) { dhall_error_set(err, ERR_IO, SPAN_NONE, "out of memory"); return NULL; }
     char canonical[PATH_BUF];
     if (!realpath(path, canonical)) {
-        dhall_error_set(err, ERR_IO, SPAN_NONE, "cannot open file '%s'", spec);
+        dhall_error_set(err, ERR_MISSING, SPAN_NONE, "cannot open file '%s'", spec);
         free(path);
         return NULL;
     }
@@ -133,9 +157,19 @@ Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *e
             return NULL;
         }
 
+    /* cache key = canonical path + optional hash, so a hashed import verifies
+       on its own fresh read rather than being satisfied by an earlier un-hashed
+       cache entry of the same file. */
+    char *ckey = xstrdup(canonical);
+    if (hash_hex) {
+        size_t cl = strlen(ckey), hl = strlen(hash_hex);
+        char *k = malloc(cl + 1 + hl + 1);
+        if (k) { memcpy(k, ckey, cl); k[cl] = ' '; memcpy(k + cl + 1, hash_hex, hl + 1); free(ckey); ckey = k; }
+    }
+
     /* cache hit */
     for (int i = 0; i < l->cn; i++)
-        if (!strcmp(l->ckeys[i], canonical)) return l->cterms[i];
+        if (!strcmp(l->ckeys[i], ckey)) { free(ckey); return l->cterms[i]; }
 
     /* depth guard */
     if (l->depth >= MAX_IMPORT_DEPTH) {
@@ -147,6 +181,21 @@ Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *e
     if (!src) {
         dhall_error_set(err, ERR_IO, SPAN_NONE, "cannot open file '%s'", spec);
         return NULL;
+    }
+
+    /* integrity check over the RAW SOURCE TEXT (deviation from real Dhall's
+       CBOR-of-normal-form). Verified on the fresh-read path only — a cache hit
+       above skips re-verification (documented simplification). */
+    if (hash_hex) {
+        char got[65];
+        sha256_hex(src, strlen(src), got);
+        if (strcmp(got, hash_hex) != 0) {
+            dhall_error_set(err, ERR_IO, SPAN_NONE,
+                            "sha256 mismatch for '%s': expected %s, got %s",
+                            spec, hash_hex, got);
+            free(src);
+            return NULL;
+        }
     }
 
     /* push chain (key + dir) */
@@ -179,7 +228,7 @@ Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *e
         l->ckeys = realloc(l->ckeys, l->ccap * sizeof(char *));
         l->cterms = realloc(l->cterms, l->ccap * sizeof(Term *));
     }
-    l->ckeys[l->cn] = xstrdup(canonical);
+    l->ckeys[l->cn] = ckey;   /* ckey ownership moves into the cache */
     l->cterms[l->cn] = t;
     l->cn++;
     return t;

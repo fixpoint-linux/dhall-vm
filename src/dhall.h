@@ -166,7 +166,9 @@ struct Term {
 /* ------------------------------------------------------------------ */
 
 typedef enum {
-    ERR_NONE = 0, ERR_LEX, ERR_PARSE, ERR_TYPE, ERR_SERIALIZE, ERR_IO
+    ERR_NONE = 0, ERR_LEX, ERR_PARSE, ERR_TYPE, ERR_SERIALIZE, ERR_IO,
+    ERR_MISSING  /* recoverable absent-import stage (`missing`/file/env unset);
+                    caught by `?`, mapped to exit 3 by dhall_error_exit */
 } ErrorStage;
 
 typedef struct {
@@ -250,7 +252,9 @@ typedef enum {
     T_PLUSPLUS, /* ++ */
     T_PLUS, T_MINUS, T_STAR,
     T_LT, T_LE, T_GT, T_GE, T_EQEQ, T_NE,
-    T_IMPORT,   /* ./path, ../path, /path, env:NAME */
+    T_IMPORT,   /* ./path, ../path, /path, env:NAME, missing */
+    T_SHA256,   /* sha256:<64 hexdigits> (import hash; hex in .name) */
+    T_QMARK,    /* ? */
     T_BAR,      /* | */
     T_MERGE,    /* /\ */
     T_PREFER,   /* // */
@@ -264,7 +268,7 @@ typedef struct {
     TokType type;
     SourceSpan span;
     Const c;
-    char *name;         /* for T_NAME and T_IMPORT spec (arena) */
+    char *name;         /* for T_NAME, T_IMPORT spec, and T_SHA256 hex (arena) */
 } Token;
 
 typedef struct {
@@ -292,14 +296,21 @@ bool lexer_eof(Lexer *lx);           /* next char is EOF */
 
 #define MAX_IMPORT_DEPTH 64   /* error (not crash) beyond this import-chain depth */
 
+/* SHA-256 (FIPS 180-4) over RAW bytes, lowercase-hex encoded into out[65].
+   Used for the sha256:<hex> import integrity check. */
+void sha256_hex(const void *data, size_t len, char out[65]);
+
 ImportLoader *import_loader_new(void);
 void import_loader_free(ImportLoader *l);
 /* register the root file (or NULL for stdin) so relative imports resolve
    against its directory and self-import is detected */
 void import_loader_push_root(ImportLoader *l, const char *root_file);
-/* resolve an import spec (./x, ../y, /abs, env:NAME) to a term.
-   On error sets *err and returns NULL. */
-Term *import_resolve(ImportLoader *l, const char *spec, Parser *p, DhallError *err);
+/* resolve an import spec (./x, ../y, /abs, env:NAME, missing) to a term.
+   hash_hex is NULL when no hash is attached. On error sets *err and returns
+   NULL; an absent import (missing / file-not-found / env-unset) is reported
+   with stage ERR_MISSING. */
+Term *import_resolve(ImportLoader *l, const char *spec, const char *hash_hex,
+                     Parser *p, DhallError *err);
 
 /* ------------------------------------------------------------------ */
 /* parser.c                                                           */
@@ -313,6 +324,9 @@ struct Parser {
     int depth;              /* current parser recursion depth (DoS guard) */
     int union_depth;        /* >0 while parsing a union alternative (no comparison) */
     ImportLoader *loader;   /* import chain/cache/dir (NULL = no imports) */
+    bool import_missing;    /* latched: an absent import was seen (recoverable) */
+    bool skip_imports;      /* discard-fallback mode: imports -> tm_var(0) placeholders */
+    DhallError missing_err; /* first absent-import error (for reporting) */
     DhallError err;
 };
 

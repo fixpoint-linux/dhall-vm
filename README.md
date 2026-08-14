@@ -203,8 +203,17 @@ env:HOME           # the value of $HOME as a Text literal
 - A per-canonical-path cache gives correct diamond-import sharing.
 - Import chain depth is capped (`MAX_IMPORT_DEPTH`, 64) — deeper chains
   error instead of overflowing the C stack.
-- **No network imports** (no URL/http/missing/sha256) — the interpreter is
-  self-contained and portable.
+- **No network imports** (no URL/http) — the interpreter is self-contained
+  and portable. Local imports also support the always-absent `missing`
+  import and a `sha256:<hex>` integrity check.
+- `e0 ? e1` (import-fallback, tighter than `with`, looser than `||`) evaluates
+  to `e1` when `e0` contains an absent import — a `missing` import, a file that
+  does not exist, or an unset `env:` variable. A failed `sha256:` check, an
+  import cycle, or a parse error is **not** recoverable by `?`.
+- The `sha256:<64 hex>` check is a **documented deviation**: real Dhall hashes
+  the CBOR encoding of the beta-normal form, but dhall-c (which has no CBOR)
+  hashes the **raw source text** (file bytes / env-var value), and the digest
+  is lowercase base16 hex rather than base64.
 
 ## Normal forms round-trip via de Bruijn references
 

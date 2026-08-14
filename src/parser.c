@@ -4,7 +4,7 @@
    interpolation via raw-char reading with recursive expression parsing.
 
    Precedence (loosest→tightest):
-     ->  <  :  <  with  <  ||  <  &&  <  comparison(== != < <= > >=)
+     ->  <  :  <  with  <  ?  <  ||  <  &&  <  comparison(== != < <= > >=)
         <  additive(+ - ++ #)  <  /\  <  //  <  multiplicative(*)  <  application
    Every constructed term's .loc is stamped (tloc) from the current token
    so type errors report file:line:col. Imports are inlined at parse time
@@ -80,6 +80,7 @@ static Term *parse_if(Parser *p);
 static Term *parse_assert(Parser *p);
 static Term *parse_arrow(Parser *p);
 static Term *parse_annotation(Parser *p);
+static Term *parse_import_alt(Parser *p);
 static Term *parse_or(Parser *p);
 static Term *parse_and(Parser *p);
 static Term *parse_comparison(Parser *p);
@@ -257,7 +258,44 @@ static Term *parse_annotation(Parser *p) {
     return e;
 }
 
-/* boolean OR / AND — LOOSER than comparisons, TIGHTER than `with`.
+/* import-alternative `?` — TIGHTER than `with`, LOOSER than `||`.
+   e0 ? e1 = e1 iff e0 contains an absent import (latched on p->import_missing
+   while parsing e0); otherwise e1 is parsed only to surface its genuine syntax
+   errors and then discarded (skip_imports so its imports are NOT resolved).
+   Left-associative via the while-loop.
+
+   The latch is SCOPED to this operand: any absent import latched by an earlier
+   SIBLING expression (e.g. an `if` condition) is saved in outer_missing and
+   re-exposed on the way out, so a `?` here never consumes a sibling's latch —
+   that would leak a tm_var(0) placeholder past parse_source's end-check. */
+static Term *parse_import_alt(Parser *p) {
+    bool outer_missing = p->import_missing;
+    p->import_missing = false;
+    Term *left = parse_or(p);
+    if (!left) return NULL;
+    bool missing = p->import_missing;
+
+    while (at(p, T_QMARK)) {
+        next(p); /* ? */
+        if (missing) {
+            p->import_missing = false;
+            left = parse_or(p);
+            if (!left) return NULL;
+            missing = p->import_missing;   /* the fallback may itself be absent */
+        } else {
+            bool save = p->skip_imports;
+            p->skip_imports = true;
+            Term *fb = parse_or(p);
+            p->skip_imports = save;
+            if (!fb) return NULL;          /* fallback discarded; left unchanged */
+            p->import_missing = false;     /* drop any latch the fallback set */
+        }
+    }
+    p->import_missing = outer_missing || missing;
+    return left;
+}
+
+/* boolean OR / AND — LOOSER than comparisons, TIGHTER than `?`.
    Inside a union alternative (union_depth > 0) neither is active, so a `||`
    or `&&` there is left to the union grammar rather than mis-lexed. */
 static Term *parse_or(Parser *p) {
@@ -392,7 +430,7 @@ static Term *parse_merge(Parser *p) {
    :/->, so `e with a = v : T` annotates the WHOLE with; the while-loop chains
    greedily, so `e with a = x with b = 1` = `(e with a = x) with b = 1`). */
 static Term *parse_with(Parser *p) {
-    Term *e = parse_or(p);
+    Term *e = parse_import_alt(p);
     if (!e) return NULL;
     while (at_name(p, "with")) {
         Token wt = next(p); /* with */
@@ -419,7 +457,7 @@ static Term *parse_with(Parser *p) {
             labels[n++] = lt.name;
         }
         if (!expect(p, T_EQUALS, "'=' in with expression")) { free(labels); return NULL; }
-        Term *v = parse_or(p);
+        Term *v = parse_import_alt(p);
         if (!v) { free(labels); return NULL; }
         char **path = arena_alloc(dhall_arena, (size_t)n * sizeof(char *));
         for (int i = 0; i < n; i++) path[i] = arena_strdup(dhall_arena, labels[i]);
@@ -463,12 +501,29 @@ static Term *parse_atom(Parser *p) {
     case T_STR_OPEN_MULTILINE: return parse_text_multiline(p);
     case T_LAMBDA: return parse_lambda(p);
     case T_IMPORT: {
+        /* discard-fallback mode: substitute a placeholder, do NOT resolve
+           (so a fallback's own imports are never fetched). */
+        if (p->skip_imports) {
+            next(p);
+            if (at(p, T_SHA256)) next(p);
+            return tloc(tm_var(0), t.span);
+        }
         if (!p->loader) { perr(p, t.span, "imports are not available"); return NULL; }
         next(p);
+        const char *hex = NULL;
+        if (at(p, T_SHA256)) hex = next(p).name;
         DhallError ie;
         dhall_error_clear(&ie);
-        Term *r = import_resolve(p->loader, t.name, p, &ie);
+        Term *r = import_resolve(p->loader, t.name, hex, p, &ie);
         if (!r) {
+            /* Absent import (missing / file-not-found / env-unset): latch the
+               flag + first error and return a placeholder; a surrounding `?`
+               may recover, else parse_source's end-check reports it. */
+            if (ie.stage == ERR_MISSING) {
+                p->import_missing = true;
+                if (p->missing_err.stage == ERR_NONE) p->missing_err = ie;
+                return tloc(tm_var(0), t.span);
+            }
             /* Only attach the import site when the inner error carried no
                location of its own (env/missing/cycle/depth).  Preserve the
                imported file's file:line:col for parse/lex errors. */
@@ -974,6 +1029,9 @@ static Term *parse_list(Parser *p) {
 Term *parse_source(Parser *p, const char *src, const char *file, DhallError *err) {
     lexer_init(&p->lx, src, file);
     p->nnames = 0;
+    p->import_missing = false;
+    p->skip_imports = false;
+    p->missing_err = (DhallError){ ERR_NONE, {0}, SPAN_NONE, false };
     dhall_error_clear(&p->err);
     Term *t = parse_term(p);
     if (!t && p->err.stage == ERR_NONE && p->lx.err.stage == ERR_NONE) {
@@ -986,6 +1044,14 @@ Term *parse_source(Parser *p, const char *src, const char *file, DhallError *err
     }
     if (parser_err(p)) {
         *err = p->err.stage != ERR_NONE ? p->err : p->lx.err;
+        return NULL;
+    }
+    /* A latched absent import that no `?` consumed (bare `missing`, or one
+       buried in a compound operand without a `?`) is a hard error. */
+    if (p->import_missing && t) {
+        *err = p->missing_err.stage != ERR_NONE
+             ? p->missing_err
+             : (DhallError){ ERR_MISSING, "missing import", SPAN_NONE, false };
         return NULL;
     }
     if (!t) { perr(p, lexer_here(&p->lx), "parse error"); *err = p->err; return NULL; }

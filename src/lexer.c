@@ -98,7 +98,7 @@ static bool tok_ends_operand(TokType t, const char *name) {
     switch (t) {
     case T_NAT: case T_INT: case T_DBL:
     case T_RPAREN: case T_RBRACKET: case T_RBRACE: case T_RANGLE:
-    case T_IMPORT: case T_STR_OPEN: case T_STR_OPEN_MULTILINE:
+    case T_IMPORT: case T_SHA256: case T_STR_OPEN: case T_STR_OPEN_MULTILINE:
         return true;
     case T_NAME:
         /* A keyword never ends an operand, and a builtin (a function value)
@@ -268,6 +268,29 @@ static Token tokenize(Lexer *lx) {
             spec[4 + nlen] = '\0';
             return emit(lx, T_IMPORT, sp, spec);
         }
+        /* `missing` import: always absent. Full-string match only, so
+           `missingfoo` stays a plain T_NAME variable. */
+        if (!strcmp(name, "missing"))
+            return emit(lx, T_IMPORT, sp, name);
+        /* sha256:<64 hexdigits> import hash. Bounded lookahead + rewind so
+           `sha256 : Text` / `sha256:Natural` still lex as T_NAME + T_COLON. */
+        if (!strcmp(name, "sha256") && cur(lx) == ':') {
+            size_t save_pos = lx->pos;
+            int save_line = lx->line, save_col = lx->col;
+            lexer_read_char(lx); /* ':' */
+            size_t hs = lx->pos;
+            while (isxdigit((unsigned char)cur(lx))) lexer_read_char(lx);
+            size_t hlen = lx->pos - hs;
+            if (hlen == 64 && !isxdigit((unsigned char)cur(lx))) {
+                char *hex = arena_alloc(dhall_arena, 65);
+                for (size_t i = 0; i < 64; i++)
+                    hex[i] = (char)tolower((unsigned char)lx->src[hs + i]);
+                hex[64] = '\0';
+                return emit(lx, T_SHA256, sp, hex);
+            }
+            /* rewind: not a hash (e.g. sha256:Natural, sha256 : Text) */
+            lx->pos = save_pos; lx->line = save_line; lx->col = save_col;
+        }
         return emit(lx, T_NAME, sp, name);
     }
 
@@ -362,6 +385,7 @@ static Token tokenize(Lexer *lx) {
         snprintf(lx->err.msg, sizeof(lx->err.msg), "unexpected '&'");
         return emit(lx, T_ERROR, sp, NULL);
     case '#': return emit(lx, T_HASH, sp, NULL);
+    case '?': return emit(lx, T_QMARK, sp, NULL);
     case '*': return emit(lx, T_STAR, sp, NULL);
     case '+':
         if (cur(lx) == '+') { lexer_read_char(lx); return emit(lx, T_PLUSPLUS, sp, NULL); }
