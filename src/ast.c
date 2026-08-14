@@ -194,7 +194,7 @@ static Term *subst_text(int j, Term *s, Term *t) {
 
 Term *subst(int j, Term *s, Term *t) {
     switch (t->tag) {
-    case TmVar: return (t->as.idx == j) ? s : t;
+    case TmVar: return (t->as.idx == j) ? s : (t->as.idx > j) ? tm_var(t->as.idx - 1) : t;
     case TmLam: return tm_lam(subst(j, s, t->as.lam.dom), subst(j + 1, shift(1, 0, s), t->as.lam.body));
     case TmPi:  return tm_pi(subst(j, s, t->as.pi.dom), subst(j + 1, shift(1, 0, s), t->as.pi.cod));
     case TmApp: return tm_app(subst(j, s, t->as.app.fn), subst(j, s, t->as.app.arg));

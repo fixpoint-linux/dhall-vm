@@ -99,14 +99,14 @@ bidirectional typechecking) includes:
   field access, `toMap`, recursive record merge (`/\`), right-biased merge
   (`//`), and `with` record update.
 - **Lists** — `[a, b, c]`, list append (`#`), `List/map`, `List/filter`,
-  `List/reverse`, `List/fold`, `List/length`, `List/head`, `List/last`,
-  `List/indexed`.
+  `List/reverse`, `List/fold`, `List/build`, `List/length`, `List/head`,
+  `List/last`, `List/indexed`.
 - **Unions** — `< A : T | B : U >` and `< A = v | B : U >`, `merge`.
 - **Optionals** — `Optional T`, `Some x`, `None T`, `Optional/fold`.
 - **Arithmetic** — `+ - *`, boolean logic (`&&`, `||`), and comparisons
   `== != < <= > >=` over `Natural`/`Integer`/`Double` (equality also over
   `Bool`/`Text`), plus `Natural/isZero`, `Natural/show`, `Natural/subtract`,
-  `Natural/fold`, `Natural/even`, `Natural/odd`, `Natural/toInteger`,
+  `Natural/fold`, `Natural/build`, `Natural/even`, `Natural/odd`, `Natural/toInteger`,
   `Integer/toDouble`, `Integer/negate`, `Integer/show`, `Integer/clamp`,
   `Double/show`, `Text/show`, `Text/replace`.
 - **Assertions** — `assert : body` where `body : Bool` and normalizes to

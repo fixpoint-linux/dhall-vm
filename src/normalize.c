@@ -760,6 +760,18 @@ Term *normalize(Term *t) {
                 return reverse_list(rev);
             }
         }
+        if (match_builtin("List/build", 2, t, args)) {
+            Term *A = normalize(args[0]);
+            Term *g = normalize(args[1]);
+            Term *listA = tm_app(tm_builtin("List"), A);
+            Term *cons = tm_lam(A, tm_lam(listA, tm_cons(tm_var(1), tm_var(0))));
+            return normalize(tm_app(tm_app(tm_app(g, listA), cons), tm_nil()));
+        }
+        if (match_builtin("Natural/build", 1, t, args)) {
+            Term *g = normalize(args[0]);
+            Term *succ = tm_lam(tm_builtin("Natural"), tm_op(OP_ADD, tm_var(0), tm_nat(1)));
+            return normalize(tm_app(tm_app(tm_app(g, tm_builtin("Natural")), succ), tm_nat(0)));
+        }
         Term *f = normalize(t->as.app.fn);
         if (f->tag == TmLam) return normalize(subst(0, t->as.app.arg, f->as.lam.body));
         return tm_app(f, normalize(t->as.app.arg));

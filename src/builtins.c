@@ -83,6 +83,21 @@ static Term *direct_natural_fold(void) {
                   tm_pi(tm_var(1), tm_var(2)))));
 }
 
+/* Natural/build : (forall (a : Type) -> (a -> a) -> a -> a) -> Natural */
+static Term *direct_natural_build(void) {
+    return tm_pi(tm_pi(tm_type(), tm_pi(tm_pi(tm_var(0), tm_var(1)), tm_pi(tm_var(1), tm_var(2)))), nat());
+}
+
+/* List/build : forall (A : Type) ->
+   (forall (list : Type) -> (A -> list -> list) -> list -> list) -> List A */
+static Term *list_build_type(void) {
+    return tm_pi(tm_type(),
+              tm_pi(tm_pi(tm_type(),
+                    tm_pi(tm_pi(tm_var(1), tm_pi(tm_var(1), tm_var(2))),
+                      tm_pi(tm_var(1), tm_var(2)))),
+                tm_app(builtin_list(), tm_var(1))));
+}
+
 /* List/head, List/last : forall T : Type -> List T -> Optional T */
 static Term *list_head_type(void) {
     return tm_pi(tm_type(),
@@ -133,5 +148,7 @@ Term *builtin_type_schema(const char *n) {
     if (!strcmp(n, "List/head"))         return list_head_type();
     if (!strcmp(n, "List/last"))         return list_head_type();
     if (!strcmp(n, "List/indexed"))      return list_indexed_type();
+    if (!strcmp(n, "List/build"))        return list_build_type();
+    if (!strcmp(n, "Natural/build"))     return direct_natural_build();
     return NULL;
 }
