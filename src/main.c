@@ -35,9 +35,42 @@ static void print_error(const DhallError *e) {
     fputc('\n', stderr);
 }
 
+static void usage(void) {
+    printf("dhall-c — a Dhall configuration-language subset interpreter\n");
+    printf("\n");
+    printf("Usage:\n");
+    printf("  dhall <mode> [file]\n");
+    printf("  dhall --help | -h\n");
+    printf("  dhall --version | -V\n");
+    printf("\n");
+    printf("Modes:\n");
+    printf("  typecheck   infer and print the type of the expression\n");
+    printf("  normalize   print the normal form\n");
+    printf("  to-json     evaluate to JSON\n");
+    printf("  to-toml     evaluate to TOML (top level must be a record)\n");
+    printf("  to-yaml     evaluate to YAML\n");
+    printf("\n");
+    printf("file is a path, or \"-\" (default) to read from stdin.\n");
+    printf("\n");
+    printf("Exit codes: 0 ok, 1 type error, 2 parse/lex error, 3 internal/IO/serialize error.\n");
+    printf("\n");
+    printf("Examples:\n");
+    printf("  dhall typecheck config.dhall\n");
+    printf("  dhall to-json config.dhall\n");
+    printf("  echo \"{ a = 1, b = True }\" | dhall to-yaml\n");
+}
+
 int main(int argc, char **argv) {
+    if (argc >= 2 && (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h"))) {
+        usage();
+        return 0;
+    }
+    if (argc >= 2 && (!strcmp(argv[1], "--version") || !strcmp(argv[1], "-V"))) {
+        printf("dhall-c %s\n", DHALL_VERSION);
+        return 0;
+    }
     if (argc < 2) {
-        fprintf(stderr, "usage: %s typecheck|normalize|to-json|to-toml|to-yaml [file|-]\n", argv[0]);
+        fprintf(stderr, "usage: %s <mode> [file]  (run '%s --help' for details)\n", argv[0], argv[0]);
         return 3;
     }
     const char *mode = argv[1];

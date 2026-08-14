@@ -13,6 +13,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Version string; a release build may override via -DDHALL_VERSION='"x.y.z"'. */
+#ifndef DHALL_VERSION
+#define DHALL_VERSION "0.1.0"
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Arena                                                              */
 /* ------------------------------------------------------------------ */

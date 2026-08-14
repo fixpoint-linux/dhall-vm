@@ -6,7 +6,8 @@ A subset interpreter for the Dhall configuration language, written in C.
 
 ```
 make            # produces dhall.com (APE) + dhall.com.dbg (ELF)
-make test       # runs the test suite
+make test       # runs the test suite (run.sh + roundtrip.sh + examples.sh + cli.sh)
+make bench      # builds and runs the in-process benchmark (src/bench.c)
 ```
 
 Requires `cosmocc` (Cosmopolitan toolchain).
@@ -19,11 +20,49 @@ dhall normalize [file|-]   # print the normal form
 dhall to-json   [file|-]   # evaluate to JSON
 dhall to-toml   [file|-]   # evaluate to TOML (top level must be a record)
 dhall to-yaml   [file|-]   # evaluate to YAML (block style, 1.2 core schema)
+dhall --help | -h          # print usage and exit 0
+dhall --version | -V       # print the version and exit 0
 ```
 
 Input is read from a file or stdin. Exit codes: `0` ok, `1` type error,
 `2` parse/lex error, `3` internal/IO/serialize error. Type errors report
 `Error: <msg> (at <file>:<line>:<col>)`.
+
+### Examples
+
+The `examples/` directory contains four self-contained (no relative-file
+import) example configuration files, each with a header comment showing the
+expected output. `make test` runs `tests/examples.sh`, which typechecks every
+example and pins the serialized output against `examples/<name>.expected.*`
+snapshots, so the docs can never drift from the implementation:
+
+- `server.dhall` — a server config (nested record, Text union with a payload,
+  `List Text`, scalars).
+- `ci.dhall` — a CI pipeline config (`let`-bound shared step lists, a `merge`
+  over a union, a list of records).
+- `env-config.dhall` — `env:` imports; type-check only (the value of `$HOME`
+  is host-specific, so no output snapshot).
+- `types.dhall` — a tour of value types (record type annotation, `Some`/`None`
+  optionals, arithmetic, comparisons, `merge`, `List/map`).
+
+Run them directly, e.g.:
+
+```
+dhall typecheck examples/server.dhall
+dhall to-json examples/server.dhall
+```
+
+### Benchmark
+
+`make bench` builds and runs an in-process benchmark (`src/bench.c`) that
+times the interpreter pipeline over a representative source string (~20-field
+nested record, a 200-element list, a `let`/lambda, and a `merge`), printing a
+table of `parse`, `parse+normalize`, `+infer_type`, and `+term_to_json`
+phases with derived per-phase ns/op. It is a measurement tool, not a
+correctness check, and is deliberately **not** part of `make all` or
+`make test` (timing is nondeterministic). Note that `bench.c` links the
+internal API and tracks `dhall.h`, so an API change may require a rebuild of
+`make bench`.
 
 ## Language features
 
