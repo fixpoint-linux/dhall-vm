@@ -44,10 +44,10 @@ int dhall_error_exit(DhallError *e) {
 
 Term *tm_var(int idx)            { Term *t = mk(TmVar, SPAN_NONE); t->as.idx = idx; return t; }
 Term *tm_const(Const c)          { Term *t = mk(TmConst, SPAN_NONE); t->as.c = c; return t; }
-Term *tm_nat(uint64_t n)         { Const c = { C_NAT, n, 0, 0, false, NULL }; return tm_const(c); }
-Term *tm_int(int64_t n)          { Const c = { C_INT, 0, n, 0, false, NULL }; return tm_const(c); }
-Term *tm_dbl(double d)           { Const c = { C_DBL, 0, 0, d, false, NULL }; return tm_const(c); }
-Term *tm_bool(bool b)            { Const c = { C_BOOL, 0, 0, 0, b, NULL }; return tm_const(c); }
+Term *tm_nat(uint64_t n)         { Const c = { C_NAT, n, 0, 0, false, NULL, NULL }; return tm_const(c); }
+Term *tm_int(int64_t n)          { Const c = { C_INT, 0, n, 0, false, NULL, NULL }; return tm_const(c); }
+Term *tm_dbl(double d)           { Const c = { C_DBL, 0, 0, d, false, NULL, NULL }; return tm_const(c); }
+Term *tm_bool(bool b)            { Const c = { C_BOOL, 0, 0, 0, b, NULL, NULL }; return tm_const(c); }
 Term *tm_text(TextPart *parts)   { Term *t = mk(TmText, SPAN_NONE); t->as.text = parts; return t; }
 Term *tm_text_lit(const char *s) { return text_parts_single(s); }
 Term *tm_type(void)              { return mk(TmType, SPAN_NONE); }
@@ -287,7 +287,12 @@ bool alpha_eq(Term *a, Term *b) {
             BigNat B = const_bignat(*y, sb);
             return bignat_cmp(&A, &B) == 0;
         }
-        case C_INT: return x->i64 == y->i64;
+        case C_INT: {
+            uint32_t sa[2], sb[2];
+            BigInt A = const_bigint(*x, sa);
+            BigInt B = const_bigint(*y, sb);
+            return bigint_cmp(&A, &B) == 0;
+        }
         case C_DBL: return x->dbl == y->dbl;
         case C_BOOL: return x->b == y->b;
         }
@@ -418,7 +423,12 @@ void print_term(FILE *out, Term *t) {
             fputs(bignat_to_decimal(&B), out);
             break;
         }
-        case C_INT: fprintf(out, "%lld", (long long)t->as.c.i64); break;
+        case C_INT: {
+            uint32_t scratch[2];
+            BigInt B = const_bigint(t->as.c, scratch);
+            fputs(bigint_to_decimal(&B), out);
+            break;
+        }
         case C_DBL: {
             char dbuf[64];
             snprintf(dbuf, sizeof(dbuf), "%g", t->as.c.dbl);

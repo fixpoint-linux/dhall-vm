@@ -204,7 +204,6 @@ static Term *norm_op(Term *t) {
     Term *l = normalize(t->as.op.lhs);
     Term *r = normalize(t->as.op.rhs);
     OpKind op = t->as.op.op;
-    SourceSpan loc = t->loc;
 
     /* boolean logic: eager AND/OR over Bool constants (no short-circuit) */
     if (op == OP_AND || op == OP_OR) {
@@ -227,13 +226,12 @@ static Term *norm_op(Term *t) {
                 return tm_const(bignat_to_const(bignat_mul(&A, &B)));
             }
             case C_INT: {
-                int64_t a = l->as.c.i64, b = r->as.c.i64, res;
-                bool ov = false;
-                if (op == OP_ADD) ov = __builtin_add_overflow(a, b, &res);
-                else if (op == OP_SUB) ov = __builtin_sub_overflow(a, b, &res);
-                else ov = __builtin_mul_overflow(a, b, &res);
-                if (ov) { norm_set_error(loc, "arithmetic overflow"); return tm_op(op, l, r); }
-                return tm_int(res);
+                uint32_t sa[2], sb[2];
+                BigInt A = const_bigint(l->as.c, sa);
+                BigInt B = const_bigint(r->as.c, sb);
+                if (op == OP_ADD) return tm_const(bigint_to_const(bigint_add(&A, &B)));
+                if (op == OP_SUB) return tm_const(bigint_to_const(bigint_sub(&A, &B)));
+                return tm_const(bigint_to_const(bigint_mul(&A, &B)));
             }
             case C_DBL: {
                 double a = l->as.c.dbl, b = r->as.c.dbl;
@@ -255,10 +253,14 @@ static Term *norm_op(Term *t) {
                 lt = c < 0; le = c <= 0; gt = c > 0; ge = c >= 0; eq = c == 0;
                 break;
             }
-            case C_INT:
-                lt = l->as.c.i64 < r->as.c.i64; le = l->as.c.i64 <= r->as.c.i64;
-                gt = l->as.c.i64 > r->as.c.i64; ge = l->as.c.i64 >= r->as.c.i64;
-                eq = l->as.c.i64 == r->as.c.i64; break;
+            case C_INT: {
+                uint32_t sa[2], sb[2];
+                BigInt A = const_bigint(l->as.c, sa);
+                BigInt B = const_bigint(r->as.c, sb);
+                int c = bigint_cmp(&A, &B);
+                lt = c < 0; le = c <= 0; gt = c > 0; ge = c >= 0; eq = c == 0;
+                break;
+            }
             case C_DBL:
                 lt = l->as.c.dbl < r->as.c.dbl; le = l->as.c.dbl <= r->as.c.dbl;
                 gt = l->as.c.dbl > r->as.c.dbl; ge = l->as.c.dbl >= r->as.c.dbl;
@@ -639,20 +641,18 @@ Term *normalize(Term *t) {
             Term *n = normalize(args[0]);
             if (n->tag == TmConst && n->as.c.kind == C_NAT) {
                 uint32_t scratch[2];
-                bool ok;
                 BigNat B = const_bignat(n->as.c, scratch);
-                uint64_t v = bignat_to_u64(&B, &ok);
-                if (!ok || v > (uint64_t)INT64_MAX) {
-                    norm_set_error(t->loc, "Natural/toInteger overflow");
-                    return t; /* stuck */
-                }
-                return tm_int((int64_t)v);
+                BigInt bi = { false, B };
+                return tm_const(bigint_to_const(bi));
             }
         }
         if (match_builtin("Integer/toDouble", 1, t, args)) {
             Term *n = normalize(args[0]);
-            if (n->tag == TmConst && n->as.c.kind == C_INT)
-                return tm_dbl((double)n->as.c.i64);
+            if (n->tag == TmConst && n->as.c.kind == C_INT) {
+                uint32_t scratch[2];
+                BigInt B = const_bigint(n->as.c, scratch);
+                return tm_dbl(bigint_to_double(&B));
+            }
         }
         if (match_builtin("Text/replace", 3, t, args)) {
             Term *needle = normalize(args[0]);
@@ -690,27 +690,32 @@ Term *normalize(Term *t) {
         if (match_builtin("Integer/negate", 1, t, args)) {
             Term *n = normalize(args[0]);
             if (n->tag == TmConst && n->as.c.kind == C_INT) {
-                int64_t res;
-                if (__builtin_sub_overflow((int64_t)0, n->as.c.i64, &res)) {
-                    norm_set_error(t->loc, "Integer/negate overflow");
-                    return t; /* stuck */
-                }
-                return tm_int(res);
+                uint32_t scratch[2];
+                BigInt B = const_bigint(n->as.c, scratch);
+                return tm_const(bigint_to_const(bigint_neg(&B)));
             }
         }
         if (match_builtin("Integer/show", 1, t, args)) {
             Term *n = normalize(args[0]);
             if (n->tag == TmConst && n->as.c.kind == C_INT) {
-                char buf[32];
-                snprintf(buf, sizeof(buf), "%s%lld", n->as.c.i64 >= 0 ? "+" : "",
-                         (long long)n->as.c.i64);
-                return tm_text_lit(buf);
+                uint32_t scratch[2];
+                BigInt B = const_bigint(n->as.c, scratch);
+                char *dec = bigint_to_decimal(&B);
+                if (B.neg) return tm_text_lit(dec);
+                char *s = arena_alloc(dhall_arena, strlen(dec) + 2);
+                s[0] = '+';
+                strcpy(s + 1, dec);
+                return tm_text_lit(s);
             }
         }
         if (match_builtin("Integer/clamp", 1, t, args)) {
             Term *n = normalize(args[0]);
-            if (n->tag == TmConst && n->as.c.kind == C_INT)
-                return tm_nat(n->as.c.i64 < 0 ? 0 : (uint64_t)n->as.c.i64);
+            if (n->tag == TmConst && n->as.c.kind == C_INT) {
+                uint32_t scratch[2];
+                BigInt B = const_bigint(n->as.c, scratch);
+                if (B.neg) return tm_nat(0);
+                return tm_const(bignat_to_const(B.mag));
+            }
         }
         if (match_builtin("Double/show", 1, t, args)) {
             Term *n = normalize(args[0]);

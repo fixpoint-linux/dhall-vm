@@ -140,10 +140,9 @@ bidirectional typechecking) includes:
 - `+ - *` require both operands to be the same scalar type
   (`Natural`/`Integer`/`Double`); `==`/`!=` also accept `Bool`/`Text`.
   Comparisons (`< <= > >=`) accept `Natural`/`Integer`/`Double`.
-- `Natural` is **unbounded** (arbitrary precision); `+` `-` `*` never
-  overflow. `Natural` subtraction **saturates** at `0` (`2 - 7 == 0`).
-  `Integer` remains 64-bit: `+ - *` overflow via built-in checked
-  arithmetic. `Double` is IEEE 754 (JSON maps non-finite to `null`).
+- `Natural` and `Integer` are **unbounded** (arbitrary precision); `+` `-` `*`
+  never overflow. `Natural` subtraction **saturates** at `0` (`2 - 7 == 0`).
+  `Double` is IEEE 754 (JSON maps non-finite to `null`).
 - Division is intentionally **not** supported (no `/` operator).
 - Operator precedence (loosest to tightest): `->`, `:`, `with`, `||`, `&&`,
   comparisons, `+ - ++ #`, `/\`, `//`, `*`, application.
@@ -160,8 +159,7 @@ bidirectional typechecking) includes:
 - `&&`/`||` require both operands to be `Bool`. `Integer/show` prints a
   leading `+` for non-negative values (`Integer/show +3` = `"+3"`), and
   `Text/show` renders a `Text` as a double-quoted Dhall literal with `$`
-  escaped as `\u0024`. `Integer/clamp` maps a negative `Integer` to `0`;
-  `Integer/negate` errors on `-9223372036854775808` (overflow).
+  escaped as `\u0024`. `Integer/clamp` maps a negative `Integer` to `0`.
 - `Natural/fold` is capped at `2^20` iterations (DoS guard).
 
 ### Optionals

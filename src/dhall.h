@@ -63,6 +63,7 @@ typedef enum {
 } ConstKind;
 
 typedef struct BigNat BigNat;   /* forward: Const.bnat references it */
+typedef struct BigInt BigInt;   /* forward: Const.big references it */
 
 typedef struct {
     ConstKind kind;
@@ -71,12 +72,21 @@ typedef struct {
     double dbl;     /* C_DBL */
     bool b;         /* C_BOOL */
     BigNat *bnat;   /* C_NAT: NULL iff value < 2^64 (held in .nat) */
+    BigInt *big;    /* C_INT: NULL iff |value| < 2^63 (held in .i64) */
 } Const;
 
 /* arbitrary-precision Natural: base-2^32 little-endian limbs; nlimbs==0 => 0 */
 struct BigNat {
     uint32_t *limbs;
     int nlimbs;
+};
+
+/* arbitrary-precision signed Integer: neg flag + magnitude (base-2^32 limbs).
+   neg==true iff value<0; mag.nlimbs==0 means 0 (neg is then always false). */
+typedef struct BigInt BigInt;
+struct BigInt {
+    bool neg;
+    BigNat mag;
 };
 
 /* binary operator kinds (TmOp) */
@@ -385,10 +395,12 @@ typedef struct Value Value;
 struct Value {
     ValueKind kind;
     bool nat_big;       /* VK_NAT: true iff .as.bnat holds an unbounded value */
+    bool int_big;       /* VK_INT: true iff .as.big holds an unbounded value */
     union {
         uint64_t nat;   /* VK_NAT (nat_big false) */
         BigNat *bnat;   /* VK_NAT (nat_big true) */
-        int64_t i64;    /* VK_INT */
+        int64_t i64;    /* VK_INT (int_big false) */
+        BigInt *big;    /* VK_INT (int_big true) */
         double dbl;     /* VK_DBL */
         bool b;         /* VK_BOOL */
         char *text;     /* VK_TEXT */
@@ -418,5 +430,15 @@ bool bignat_is_zero(const BigNat *a);
 bool bignat_even(const BigNat *a);
 BigNat const_bignat(Const c, uint32_t scratch[2]);
 Const bignat_to_const(BigNat b);
+
+BigInt const_bigint(Const c, uint32_t scratch[2]);
+Const bigint_to_const(BigInt b);
+BigInt bigint_add(const BigInt *a, const BigInt *b);
+BigInt bigint_sub(const BigInt *a, const BigInt *b);
+BigInt bigint_mul(const BigInt *a, const BigInt *b);
+BigInt bigint_neg(const BigInt *a);
+int bigint_cmp(const BigInt *a, const BigInt *b);
+char *bigint_to_decimal(const BigInt *a);
+double bigint_to_double(const BigInt *a);
 
 #endif /* DHALL_H */

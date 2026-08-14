@@ -173,9 +173,98 @@ Const bignat_to_const(BigNat b) {
         uint64_t v = 0;
         if (b.nlimbs >= 1) v |= b.limbs[0];
         if (b.nlimbs >= 2) v |= (uint64_t)b.limbs[1] << 32;
-        return (Const){ C_NAT, v, 0, 0, false, NULL };
+        return (Const){ C_NAT, v, 0, 0, false, NULL, NULL };
     }
     BigNat *p = arena_alloc(dhall_arena, sizeof(BigNat));
     *p = b;
-    return (Const){ C_NAT, 0, 0, 0, false, p };
+    return (Const){ C_NAT, 0, 0, 0, false, p, NULL };
+}
+
+/* ---------------- arbitrary-precision signed Integer ---------------- */
+
+/* build a signed value, normalizing -0 (mag.nlimbs==0 => neg=false) */
+static BigInt bi_mk(bool neg, BigNat mag) {
+    if (mag.nlimbs == 0) neg = false;
+    BigInt b = { neg, mag };
+    return b;
+}
+
+/* small<->big seam for C_INT: view any Const as a signed BigInt, using caller
+   scratch for the small path (no allocation for |value| < 2^63).  The i64
+   magnitude is computed without INT64_MIN negation UB. */
+BigInt const_bigint(Const c, uint32_t scratch[2]) {
+    if (c.big) return *c.big;
+    int64_t v = c.i64;
+    uint64_t mag = (v >= 0) ? (uint64_t)v : (uint64_t)(-(v + 1)) + 1u;
+    int n = bignat_from_u64(mag, scratch);
+    BigInt b = { v < 0, { scratch, n } };
+    return b;
+}
+
+/* BigInt -> Const: small magnitudes (|v| fits int64) narrow back to .i64;
+   larger allocate a BigInt and set .big.  The big path DEEP-COPIES the
+   magnitude because callers (lexer signed-literal, Natural/toInteger) feed
+   stack-scratch limb arrays for the 2-limb 2^63..2^64-1 range. */
+Const bigint_to_const(BigInt b) {
+    if (b.mag.nlimbs == 0)
+        return (Const){ C_INT, 0, 0, 0, false, NULL, NULL };
+    bool ok;
+    uint64_t mag = bignat_to_u64(&b.mag, &ok);
+    if (ok && !b.neg && mag <= (uint64_t)INT64_MAX)
+        return (Const){ C_INT, 0, (int64_t)mag, 0, false, NULL, NULL };
+    if (ok && b.neg && mag <= (uint64_t)INT64_MAX + 1u) {
+        int64_t v = (mag == (uint64_t)INT64_MAX + 1u) ? INT64_MIN : -(int64_t)mag;
+        return (Const){ C_INT, 0, v, 0, false, NULL, NULL };
+    }
+    BigInt *p = arena_alloc(dhall_arena, sizeof(BigInt));
+    p->neg = b.neg;
+    p->mag.nlimbs = b.mag.nlimbs;
+    p->mag.limbs = arena_alloc(dhall_arena, (size_t)b.mag.nlimbs * 4);
+    memcpy(p->mag.limbs, b.mag.limbs, (size_t)b.mag.nlimbs * 4);
+    return (Const){ C_INT, 0, 0, 0, false, NULL, p };
+}
+
+BigInt bigint_add(const BigInt *a, const BigInt *b) {
+    if (a->neg == b->neg)
+        return bi_mk(a->neg, bignat_add(&a->mag, &b->mag));
+    int c = bignat_cmp(&a->mag, &b->mag);
+    if (c == 0) return bi_mk(false, (BigNat){ NULL, 0 });
+    if (c > 0) return bi_mk(a->neg, bignat_sub(&a->mag, &b->mag));
+    return bi_mk(b->neg, bignat_sub(&b->mag, &a->mag));
+}
+
+BigInt bigint_sub(const BigInt *a, const BigInt *b) {
+    BigInt nb = bi_mk(!b->neg, b->mag);
+    return bigint_add(a, &nb);
+}
+
+BigInt bigint_mul(const BigInt *a, const BigInt *b) {
+    return bi_mk(a->neg != b->neg, bignat_mul(&a->mag, &b->mag));
+}
+
+BigInt bigint_neg(const BigInt *a) {
+    return bi_mk(!a->neg, a->mag);
+}
+
+int bigint_cmp(const BigInt *a, const BigInt *b) {
+    if (a->neg != b->neg) return a->neg ? -1 : 1;
+    int c = bignat_cmp(&a->mag, &b->mag);
+    return a->neg ? -c : c;
+}
+
+/* signed decimal, arena-allocated; no leading '+' for non-negative values */
+char *bigint_to_decimal(const BigInt *a) {
+    if (a->mag.nlimbs == 0) return arena_strdup(dhall_arena, "0");
+    char *d = bignat_to_decimal(&a->mag);
+    if (!a->neg) return d;
+    size_t len = strlen(d);
+    char *s = arena_alloc(dhall_arena, len + 2);
+    s[0] = '-';
+    memcpy(s + 1, d, len + 1);
+    return s;
+}
+
+/* strtod over the decimal form; precision-loss, no error (matches Dhall) */
+double bigint_to_double(const BigInt *a) {
+    return strtod(bigint_to_decimal(a), NULL);
 }
