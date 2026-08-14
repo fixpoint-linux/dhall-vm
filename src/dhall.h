@@ -57,13 +57,22 @@ typedef enum {
     C_NAT, C_INT, C_DBL, C_BOOL
 } ConstKind;
 
+typedef struct BigNat BigNat;   /* forward: Const.bnat references it */
+
 typedef struct {
     ConstKind kind;
     uint64_t nat;   /* C_NAT */
     int64_t i64;    /* C_INT */
     double dbl;     /* C_DBL */
     bool b;         /* C_BOOL */
+    BigNat *bnat;   /* C_NAT: NULL iff value < 2^64 (held in .nat) */
 } Const;
+
+/* arbitrary-precision Natural: base-2^32 little-endian limbs; nlimbs==0 => 0 */
+struct BigNat {
+    uint32_t *limbs;
+    int nlimbs;
+};
 
 /* binary operator kinds (TmOp) */
 typedef enum {
@@ -328,8 +337,10 @@ typedef enum {
 typedef struct Value Value;
 struct Value {
     ValueKind kind;
+    bool nat_big;       /* VK_NAT: true iff .as.bnat holds an unbounded value */
     union {
-        uint64_t nat;   /* VK_NAT */
+        uint64_t nat;   /* VK_NAT (nat_big false) */
+        BigNat *bnat;   /* VK_NAT (nat_big true) */
         int64_t i64;    /* VK_INT */
         double dbl;     /* VK_DBL */
         bool b;         /* VK_BOOL */
@@ -343,5 +354,22 @@ bool term_to_json(FILE *out, Term *t, DhallError *err); /* true on success */
 bool term_to_toml(FILE *out, Term *t, DhallError *err); /* true on success */
 bool term_to_yaml(FILE *out, Term *t, DhallError *err); /* true on success */
 bool term_serialize(FILE *out, Term *t, SerFormat fmt, DhallError *err);
+
+/* ------------------------------------------------------------------ */
+/* bignum.c — arbitrary-precision Natural (base-2^32 limbs)          */
+/* ------------------------------------------------------------------ */
+
+int bignat_from_u64(uint64_t n, uint32_t scratch[2]);
+uint64_t bignat_to_u64(const BigNat *a, bool *ok);
+BigNat bignat_from_decimal(const char *digits);
+char *bignat_to_decimal(const BigNat *a);
+BigNat bignat_add(const BigNat *a, const BigNat *b);
+BigNat bignat_sub(const BigNat *a, const BigNat *b);
+BigNat bignat_mul(const BigNat *a, const BigNat *b);
+int bignat_cmp(const BigNat *a, const BigNat *b);
+bool bignat_is_zero(const BigNat *a);
+bool bignat_even(const BigNat *a);
+BigNat const_bignat(Const c, uint32_t scratch[2]);
+Const bignat_to_const(BigNat b);
 
 #endif /* DHALL_H */

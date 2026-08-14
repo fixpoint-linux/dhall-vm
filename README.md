@@ -73,9 +73,9 @@ bidirectional typechecking) includes:
 - `+ - *` require both operands to be the same scalar type
   (`Natural`/`Integer`/`Double`); `==`/`!=` also accept `Bool`/`Text`.
   Comparisons (`< <= > >=`) accept `Natural`/`Integer`/`Double`.
-- `Natural` subtraction **saturates** at `0` (`2 - 7 == 0`).
-- `Natural` `+`/`*` overflow is a runtime error (detected during
-  normalization); `Integer` `+ - *` overflow via built-in checked
+- `Natural` is **unbounded** (arbitrary precision); `+` `-` `*` never
+  overflow. `Natural` subtraction **saturates** at `0` (`2 - 7 == 0`).
+  `Integer` remains 64-bit: `+ - *` overflow via built-in checked
   arithmetic. `Double` is IEEE 754 (JSON maps non-finite to `null`).
 - Division is intentionally **not** supported (no `/` operator).
 - Operator precedence (loosest to tightest): `->`, `:`, `with`, comparisons,

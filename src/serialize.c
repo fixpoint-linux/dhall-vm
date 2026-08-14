@@ -24,6 +24,7 @@ static const char *format_name(SerFormat fmt) {
 
 static Value *vnull(void) { Value *v = arena_alloc(dhall_arena, sizeof *v); v->kind = VK_NULL; return v; }
 static Value *vnat(uint64_t n) { Value *v = arena_alloc(dhall_arena, sizeof *v); v->kind = VK_NAT; v->as.nat = n; return v; }
+static Value *vnat_big(BigNat *b) { Value *v = arena_alloc(dhall_arena, sizeof *v); v->kind = VK_NAT; v->nat_big = true; v->as.bnat = b; return v; }
 static Value *vint(int64_t n) { Value *v = arena_alloc(dhall_arena, sizeof *v); v->kind = VK_INT; v->as.i64 = n; return v; }
 static Value *vdbl(double d) { Value *v = arena_alloc(dhall_arena, sizeof *v); v->kind = VK_DBL; v->as.dbl = d; return v; }
 static Value *vbool(bool b) { Value *v = arena_alloc(dhall_arena, sizeof *v); v->kind = VK_BOOL; v->as.b = b; return v; }
@@ -37,7 +38,7 @@ static Value *term_to_value(Term *t, SerFormat fmt, DhallError *err) {
     switch (t->tag) {
     case TmConst:
         switch (t->as.c.kind) {
-        case C_NAT: return vnat(t->as.c.nat);
+        case C_NAT: return (t->as.c.bnat) ? vnat_big(t->as.c.bnat) : vnat(t->as.c.nat);
         case C_INT: return vint(t->as.c.i64);
         case C_DBL: return vdbl(t->as.c.dbl);
         case C_BOOL: return vbool(t->as.c.b);
@@ -197,7 +198,10 @@ static char *toml_key_str(const char *k) {
 static void json_value(FILE *out, const Value *v) {
     switch (v->kind) {
     case VK_NULL: fputs("null", out); break;
-    case VK_NAT: fprintf(out, "%llu", (unsigned long long)v->as.nat); break;
+    case VK_NAT:
+        if (v->nat_big) fputs(bignat_to_decimal(v->as.bnat), out);
+        else fprintf(out, "%llu", (unsigned long long)v->as.nat);
+        break;
     case VK_INT: fprintf(out, "%lld", (long long)v->as.i64); break;
     case VK_DBL: dbl_json(out, v->as.dbl); break;
     case VK_BOOL: fputs(v->as.b ? "true" : "false", out); break;
@@ -249,7 +253,10 @@ static bool yaml_plain_ok(const char *s) {
 static void yaml_scalar(FILE *out, const Value *v) {
     switch (v->kind) {
     case VK_NULL: fputs("null", out); break;
-    case VK_NAT: fprintf(out, "%llu", (unsigned long long)v->as.nat); break;
+    case VK_NAT:
+        if (v->nat_big) fputs(bignat_to_decimal(v->as.bnat), out);
+        else fprintf(out, "%llu", (unsigned long long)v->as.nat);
+        break;
     case VK_INT: fprintf(out, "%lld", (long long)v->as.i64); break;
     case VK_DBL: dbl_yaml(out, v->as.dbl); break;
     case VK_BOOL: fputs(v->as.b ? "true" : "false", out); break;
@@ -315,6 +322,10 @@ static bool value_to_yaml(FILE *out, const Value *v, DhallError *err) {
 static bool toml_value(FILE *out, const Value *v, DhallError *err) {
     switch (v->kind) {
     case VK_NAT:
+        if (v->nat_big) {
+            if (err) dhall_error_set(err, ERR_SERIALIZE, SPAN_NONE, "Natural exceeds TOML signed 64-bit range");
+            return false;
+        }
         if (v->as.nat > (uint64_t)INT64_MAX) {
             if (err) dhall_error_set(err, ERR_SERIALIZE, SPAN_NONE, "Natural exceeds TOML signed 64-bit range");
             return false;
@@ -384,7 +395,7 @@ static bool toml_table(FILE *out, const Value *v, const char *prefix, DhallError
    emitting any partial output. */
 static const Value *toml_find_bad(const Value *v) {
     if (v->kind == VK_NULL) return v;
-    if (v->kind == VK_NAT && v->as.nat > (uint64_t)INT64_MAX) return v;
+    if (v->kind == VK_NAT && (v->nat_big || v->as.nat > (uint64_t)INT64_MAX)) return v;
     if (v->kind == VK_ARRAY) {
         for (int i = 0; i < v->as.arr.n; i++) { const Value *b = toml_find_bad(v->as.arr.items[i]); if (b) return b; }
     } else if (v->kind == VK_TABLE) {

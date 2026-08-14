@@ -116,7 +116,7 @@ static Token emit(Lexer *lx, TokType t, SourceSpan sp, const char *name) {
     tok.type = t;
     tok.span = sp;
     tok.name = (char *)name;
-    tok.c = (Const){ C_NAT, 0, 0, 0, false };
+    tok.c = (Const){ C_NAT, 0, 0, 0, false, NULL };
     lx->after_operand = tok_ends_operand(t, name);
     return tok;
 }
@@ -165,8 +165,15 @@ static Token tokenize(Lexer *lx) {
                 double v = t.c.dbl;
                 if (c == '-') v = -v;
                 Token r = emit(lx, T_DBL, sp, NULL);
-                r.c = (Const){ C_DBL, 0, 0, v, false };
+                r.c = (Const){ C_DBL, 0, 0, v, false, NULL };
                 return r;
+            }
+            /* a big natural magnitude is >= 2^64 > INT64_MAX+1, so both +n
+               and -n overflow the (still 64-bit) Integer type. */
+            if (t.c.bnat) {
+                lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
+                snprintf(lx->err.msg, sizeof(lx->err.msg), "Integer literal overflow");
+                return emit(lx, T_ERROR, sp, NULL);
             }
             /* Integer: range-check the magnitude before signed conversion to
                avoid implementation-defined cast and signed-negation UB. */
@@ -179,7 +186,7 @@ static Token tokenize(Lexer *lx) {
                 }
                 int64_t v = (mag == (uint64_t)INT64_MAX + 1u) ? INT64_MIN : -(int64_t)mag;
                 Token r = emit(lx, T_INT, sp, NULL);
-                r.c = (Const){ C_INT, 0, v, 0, false };
+                r.c = (Const){ C_INT, 0, v, 0, false, NULL };
                 return r;
             } else {
                 if (mag > (uint64_t)INT64_MAX) {
@@ -188,7 +195,7 @@ static Token tokenize(Lexer *lx) {
                     return emit(lx, T_ERROR, sp, NULL);
                 }
                 Token r = emit(lx, T_INT, sp, NULL);
-                r.c = (Const){ C_INT, 0, (int64_t)mag, 0, false };
+                r.c = (Const){ C_INT, 0, (int64_t)mag, 0, false, NULL };
                 return r;
             }
         }
@@ -217,20 +224,20 @@ static Token tokenize(Lexer *lx) {
             errno = 0;
             double d = strtod(buf, &end);
             Token t = emit(lx, T_DBL, sp, NULL);
-            t.c = (Const){ C_DBL, 0, 0, d, false };
+            t.c = (Const){ C_DBL, 0, 0, d, false, NULL };
             return t;
         }
-        /* Natural */
+        /* Natural (arbitrary precision: ERANGE => parse the decimal as a BigNat) */
         char *buf = arena_strndup(dhall_arena, lx->src + start, lx->pos - start);
         errno = 0;
         unsigned long long v = strtoull(buf, NULL, 10);
-        if (errno == ERANGE) {
-            lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
-            snprintf(lx->err.msg, sizeof(lx->err.msg), "Natural literal overflow");
-            return emit(lx, T_ERROR, sp, NULL);
-        }
         Token t = emit(lx, T_NAT, sp, NULL);
-        t.c = (Const){ C_NAT, (uint64_t)v, 0, 0, false };
+        if (errno == ERANGE) {
+            BigNat bn = bignat_from_decimal(buf);
+            t.c = bignat_to_const(bn);
+        } else {
+            t.c = (Const){ C_NAT, (uint64_t)v, 0, 0, false, NULL };
+        }
         return t;
     }
 

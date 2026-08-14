@@ -211,14 +211,12 @@ static Term *norm_op(Term *t) {
         if (op == OP_ADD || op == OP_SUB || op == OP_MUL) {
             switch (k) {
             case C_NAT: {
-                uint64_t a = l->as.c.nat, b = r->as.c.nat;
-                if (op == OP_ADD) {
-                    if (a > UINT64_MAX - b) { norm_set_error(loc, "arithmetic overflow"); return tm_op(op, l, r); }
-                    return tm_nat(a + b);
-                }
-                if (op == OP_SUB) return tm_nat(a < b ? 0 : a - b);
-                if (b != 0 && a > UINT64_MAX / b) { norm_set_error(loc, "arithmetic overflow"); return tm_op(op, l, r); }
-                return tm_nat(a * b);
+                uint32_t sa[2], sb[2];
+                BigNat A = const_bignat(l->as.c, sa);
+                BigNat B = const_bignat(r->as.c, sb);
+                if (op == OP_ADD) return tm_const(bignat_to_const(bignat_add(&A, &B)));
+                if (op == OP_SUB) return tm_const(bignat_to_const(bignat_sub(&A, &B)));
+                return tm_const(bignat_to_const(bignat_mul(&A, &B)));
             }
             case C_INT: {
                 int64_t a = l->as.c.i64, b = r->as.c.i64, res;
@@ -241,10 +239,14 @@ static Term *norm_op(Term *t) {
             /* comparisons */
             bool lt = false, le = false, gt = false, ge = false, eq = false;
             switch (k) {
-            case C_NAT:
-                lt = l->as.c.nat < r->as.c.nat; le = l->as.c.nat <= r->as.c.nat;
-                gt = l->as.c.nat > r->as.c.nat; ge = l->as.c.nat >= r->as.c.nat;
-                eq = l->as.c.nat == r->as.c.nat; break;
+            case C_NAT: {
+                uint32_t sa[2], sb[2];
+                BigNat A = const_bignat(l->as.c, sa);
+                BigNat B = const_bignat(r->as.c, sb);
+                int c = bignat_cmp(&A, &B);
+                lt = c < 0; le = c <= 0; gt = c > 0; ge = c >= 0; eq = c == 0;
+                break;
+            }
             case C_INT:
                 lt = l->as.c.i64 < r->as.c.i64; le = l->as.c.i64 <= r->as.c.i64;
                 gt = l->as.c.i64 > r->as.c.i64; ge = l->as.c.i64 >= r->as.c.i64;
@@ -478,8 +480,11 @@ Term *normalize(Term *t) {
             /* args: [0]=n, [1]=A, [2]=step (A->A), [3]=base (A) */
             Term *n = normalize(args[0]);
             if (n->tag == TmConst && n->as.c.kind == C_NAT) {
-                uint64_t count = n->as.c.nat;
-                if (count > MAX_NAT_FOLD) {
+                uint32_t scratch[2];
+                bool ok;
+                BigNat B = const_bignat(n->as.c, scratch);
+                uint64_t count = bignat_to_u64(&B, &ok);
+                if (!ok || count > MAX_NAT_FOLD) {
                     norm_set_error(t->loc, "Natural/fold limit exceeded");
                     return t; /* stuck */
                 }
@@ -491,15 +496,18 @@ Term *normalize(Term *t) {
         }
         if (match_builtin("Natural/isZero", 1, t, args)) {
             Term *n = normalize(args[0]);
-            if (n->tag == TmConst && n->as.c.kind == C_NAT)
-                return tm_bool(n->as.c.nat == 0);
+            if (n->tag == TmConst && n->as.c.kind == C_NAT) {
+                uint32_t scratch[2];
+                BigNat B = const_bignat(n->as.c, scratch);
+                return tm_bool(bignat_is_zero(&B));
+            }
         }
         if (match_builtin("Natural/show", 1, t, args)) {
             Term *n = normalize(args[0]);
             if (n->tag == TmConst && n->as.c.kind == C_NAT) {
-                char buf[32];
-                snprintf(buf, sizeof(buf), "%llu", (unsigned long long)n->as.c.nat);
-                return tm_text_lit(buf);
+                uint32_t scratch[2];
+                BigNat B = const_bignat(n->as.c, scratch);
+                return tm_text_lit(bignat_to_decimal(&B));
             }
         }
         if (match_builtin("Natural/subtract", 2, t, args)) {
@@ -508,27 +516,41 @@ Term *normalize(Term *t) {
             Term *a = normalize(args[0]);
             Term *b = normalize(args[1]);
             if (a->tag == TmConst && a->as.c.kind == C_NAT &&
-                b->tag == TmConst && b->as.c.kind == C_NAT)
-                return tm_nat(b->as.c.nat < a->as.c.nat ? 0 : b->as.c.nat - a->as.c.nat);
+                b->tag == TmConst && b->as.c.kind == C_NAT) {
+                uint32_t sa[2], sb[2];
+                BigNat A = const_bignat(a->as.c, sa);
+                BigNat B = const_bignat(b->as.c, sb);
+                return tm_const(bignat_to_const(bignat_sub(&B, &A)));
+            }
         }
         if (match_builtin("Natural/even", 1, t, args)) {
             Term *n = normalize(args[0]);
-            if (n->tag == TmConst && n->as.c.kind == C_NAT)
-                return tm_bool(n->as.c.nat % 2 == 0);
+            if (n->tag == TmConst && n->as.c.kind == C_NAT) {
+                uint32_t scratch[2];
+                BigNat B = const_bignat(n->as.c, scratch);
+                return tm_bool(bignat_even(&B));
+            }
         }
         if (match_builtin("Natural/odd", 1, t, args)) {
             Term *n = normalize(args[0]);
-            if (n->tag == TmConst && n->as.c.kind == C_NAT)
-                return tm_bool(n->as.c.nat % 2 == 1);
+            if (n->tag == TmConst && n->as.c.kind == C_NAT) {
+                uint32_t scratch[2];
+                BigNat B = const_bignat(n->as.c, scratch);
+                return tm_bool(!bignat_even(&B));
+            }
         }
         if (match_builtin("Natural/toInteger", 1, t, args)) {
             Term *n = normalize(args[0]);
             if (n->tag == TmConst && n->as.c.kind == C_NAT) {
-                if (n->as.c.nat > (uint64_t)INT64_MAX) {
+                uint32_t scratch[2];
+                bool ok;
+                BigNat B = const_bignat(n->as.c, scratch);
+                uint64_t v = bignat_to_u64(&B, &ok);
+                if (!ok || v > (uint64_t)INT64_MAX) {
                     norm_set_error(t->loc, "Natural/toInteger overflow");
                     return t; /* stuck */
                 }
-                return tm_int((int64_t)n->as.c.nat);
+                return tm_int((int64_t)v);
             }
         }
         if (match_builtin("Integer/toDouble", 1, t, args)) {

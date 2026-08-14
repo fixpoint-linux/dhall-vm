@@ -406,7 +406,7 @@ static Term *parse_field(Parser *p) {
 static Term *parse_atom(Parser *p) {
     Token t = peek(p);
     switch (t.type) {
-    case T_NAT: next(p); return tloc(tm_nat(t.c.nat), t.span);
+    case T_NAT: next(p); return tloc(tm_const(t.c), t.span);
     case T_INT: next(p); return tloc(tm_int(t.c.i64), t.span);
     case T_DBL: next(p); return tloc(tm_dbl(t.c.dbl), t.span);
     case T_STR_OPEN: return parse_text(p);
