@@ -107,18 +107,29 @@ env:HOME           # the value of $HOME as a Text literal
 - **No network imports** (no URL/http/missing/sha256) — the interpreter is
   self-contained and portable.
 
-## Known limitation: lambda normal forms do not round-trip
+## Normal forms round-trip via de Bruijn references
 
 `normalize` prints de Bruijn-bound variables with synthetic names (`_0`, `_1`,
-…). For example, `\\(x : Natural) -> \\(y : Natural) -> x` normalizes to
-`\\(_ : Natural) -> \\(_ : Natural) -> _1`. The synthetic `_0`/`_1` names are
-**not** legal Dhall identifiers, so re-parsing this output fails with an
-"unbound variable" error.
+…). For example, `\(x : Natural) -> \(y : Natural) -> x` normalizes to
+`\(_ : Natural) -> \(_ : Natural) -> _1`. The parser accepts `_N` (an
+underscore followed only by decimal digits) as a de Bruijn-index reference, so
+printed normal forms **do round-trip**: they can be re-parsed, type-checked, and
+re-normalized to themselves (idempotent).
 
-This is a cosmetic limitation of the CLI output: the printed form is a faithful
-normal form (correct, capture-avoiding, type-preserving), but it is intended for
-human inspection rather than round-tripping. Fully-qualified names could be
-restored by tracking the original binder names during normalization, but that is
+**Documented deviation:** `_N` (underscore + all-digits, e.g. `_1`) is reserved
+as a de Bruijn reference, not an ordinary identifier. `_` alone and
+`_foo`/`_1a` remain ordinary identifiers. N maps directly to the de Bruijn index
+and is bounds-checked; an out-of-range or overflowing `_N` is a parse error
+(`invalid de Bruijn index`).
+
+## Known limitation: stuck text interpolation
+
+`normalize` and `to-json` modes reject interpolation of a **closed non-Text**
+value (e.g. `"${1+2}"` or `"${True}"`) with `interpolation requires Text`. However,
+a **stuck** interpolation whose value is a bound variable of type Text (e.g.
+`\(x : Text) -> "${x}"`) is still silently dropped, producing `\(_ : Text) -> ""`.
+This is a known limitation (a faithful fix would require preserving interpolated
+sub-terms through normalization and printing them back as `"${_0}"`), and is
 deliberately out of scope for this subset interpreter.
 
 ## Recursion depth

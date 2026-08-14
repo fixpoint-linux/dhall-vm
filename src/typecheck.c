@@ -158,8 +158,10 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
     case TmText: {
         /* check interpolation subterms are Text */
         for (TextPart *p = t->as.text; p; p = p->next)
-            if (p->expr && !check(g, p->expr, tm_builtin("Text"), err))
+            if (p->expr && !check(g, p->expr, tm_builtin("Text"), err)) {
+                err_here(err, ERR_TYPE, p->expr, "interpolation requires Text");
                 return NULL;
+            }
         return tm_builtin("Text");
     }
     case TmType: return tm_kind();
@@ -436,8 +438,10 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
     }
     if (t->tag == TmText && nty->tag == TmBuiltin && !strcmp(nty->as.bname, "Text")) {
         for (TextPart *p = t->as.text; p; p = p->next)
-            if (p->expr && !check(g, p->expr, tm_builtin("Text"), err))
+            if (p->expr && !check(g, p->expr, tm_builtin("Text"), err)) {
+                err_here(err, ERR_TYPE, p->expr, "interpolation requires Text");
                 return false;
+            }
         return true;
     }
     Term *got = infer(g, t, err);

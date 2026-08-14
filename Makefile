@@ -12,7 +12,7 @@ dhall.com: $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o dhall.com $(SRC)
 
 test: all
-	./tests/run.sh ./dhall.com.dbg
+	./tests/run.sh ./dhall.com.dbg && ./tests/roundtrip.sh ./dhall.com.dbg
 
 clean:
 	rm -f dhall.com dhall.com.dbg

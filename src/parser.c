@@ -11,6 +11,8 @@
    (no TmImport tag survives; the loader lives in Parser.loader). */
 #include "dhall.h"
 #include <ctype.h>
+#include <limits.h>
+#include <errno.h>
 
 static Token peek(Parser *p) { return lexer_peek(&p->lx); }
 static Token next(Parser *p) { return lexer_next(&p->lx); }
@@ -380,6 +382,26 @@ static Term *parse_atom(Parser *p) {
     case T_LBRACKET: return parse_list(p);
     case T_NAME: {
         const char *s = t.name;
+        /* '_N' (underscore followed only by digits) is a de Bruijn index
+           reference used to round-trip printed normal forms. N maps directly
+           to the de Bruijn index, bypassing the name stack. '_' alone and
+           '_foo'/'_1a' remain ordinary identifiers. */
+        if (s[0] == '_' && s[1] != '\0') {
+            bool all_digits = true;
+            for (int i = 1; s[i]; i++)
+                if (!isdigit((unsigned char)s[i])) { all_digits = false; break; }
+            if (all_digits) {
+                errno = 0;
+                char *end = NULL;
+                long n = strtol(s + 1, &end, 10);
+                if (errno == ERANGE || end == s + 1 || n < 0 || n > INT_MAX) {
+                    perr(p, t.span, "invalid de Bruijn index");
+                    return NULL;
+                }
+                next(p);
+                return tloc(tm_var((int)n), t.span);
+            }
+        }
         if (!strcmp(s, "True")) { next(p); return tloc(tm_bool(true), t.span); }
         if (!strcmp(s, "False")) { next(p); return tloc(tm_bool(false), t.span); }
         if (!strcmp(s, "Type")) { next(p); return tloc(tm_type(), t.span); }

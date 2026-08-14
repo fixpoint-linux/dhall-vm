@@ -63,6 +63,34 @@ static bool text_has_interp(Term *t) {
     return false;
 }
 
+/* true if the normalized value is a closed WHNF that is definitively NOT Text.
+   Used to reject non-Text interpolation in normalize/to-json modes (which have
+   no type information). Stuck/unknown-type terms (TmVar, TmApp, TmField, ...)
+   are left to the existing behavior (silently dropped), matching well-typed
+   semantics where bound-Text interpolations may remain stuck. */
+static bool is_closed_nontext_value(Term *e) {
+    switch (e->tag) {
+    case TmConst:
+    case TmType:
+    case TmKind:
+    case TmSort:
+    case TmNil:
+    case TmCons:
+    case TmRecordLit:
+    case TmRecordType:
+    case TmUnionLit:
+    case TmUnionType:
+    case TmBuiltin:
+    case TmLam:
+    case TmPi:
+    case TmSome:
+    case TmNone:
+        return true;
+    default:
+        return false;
+    }
+}
+
 /* concatenate all parts into one arena string. interpolations must have
    normalized to plain text literals (guaranteed for well-typed input). */
 static char *text_concat(Term *t) {
@@ -74,6 +102,8 @@ static char *text_concat(Term *t) {
             Term *e = normalize(p->expr);
             if (e->tag == TmText && e->as.text && !e->as.text->expr && e->as.text->lit)
                 tmpbuf_add(&b, e->as.text->lit);
+            else if (is_closed_nontext_value(e))
+                norm_set_error(p->expr->loc, "interpolation requires Text");
         }
     }
     return tmpbuf_arena(dhall_arena, &b);
