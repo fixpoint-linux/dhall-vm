@@ -44,9 +44,15 @@ static Value *term_to_value(Term *t, SerFormat fmt, DhallError *err) {
         }
         break; /* unreachable: all ConstKind values handled above */
     case TmText:
-        if (!t->as.text || t->as.text->expr) {
+        if (!t->as.text) {
             if (err) dhall_error_set(err, ERR_SERIALIZE, SPAN_NONE, "text interpolation not normalized");
             return NULL;
+        }
+        for (TextPart *p = t->as.text; p; p = p->next) {
+            if (p->expr) {
+                if (err) dhall_error_set(err, ERR_SERIALIZE, SPAN_NONE, "text interpolation not normalized");
+                return NULL;
+            }
         }
         return vtext(t->as.text->lit);
     case TmRecordLit: {
