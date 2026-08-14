@@ -59,7 +59,7 @@
           <div class="pane">
             <label for="source">Dhall source</label>
             <textarea id="source" spellcheck="false" autocomplete="off"
-              placeholder="{ greeting = \"Hello, \" ++ \"world!\", count = 1 + 2 }"></textarea>
+              placeholder="{ greeting = &quot;Hello, &quot; ++ &quot;world!&quot;, count = 1 + 2 }"></textarea>
           </div>
           <div class="pane">
             <label for="output">Result</label>
@@ -133,7 +133,7 @@ dhall to-toml   [file|-]   # evaluate to TOML (top level must be a record)
 dhall to-yaml   [file|-]   # evaluate to YAML (block style, 1.2 core schema)</code></pre>
       <p>Rebuild the in-browser WASM (requires <code>emscripten clang lld llvm</code>):</p>
       <pre><code>make wasm            # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
-node tests/wasm-smoke.js   # headless browser-API smoke test (6 checks)</code></pre>
+node tests/wasm-smoke.js   # headless browser-API smoke test (8 checks)</code></pre>
     </div>
   </section>
 
