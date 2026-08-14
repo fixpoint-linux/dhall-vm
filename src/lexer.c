@@ -93,6 +93,22 @@ static bool is_import_path_char(int c) {
     return false;
 }
 
+/* URL character set for a scheme:// import body: alnum + unreserved/pchar/
+   sub-delims + ':' + '@'.  EXCLUDES '?' (import-alt) and '#' (list-append), so
+   query strings and fragments are unsupported (documented subset limitation —
+   percent-encode them). */
+static bool is_url_char(int c) {
+    if (c == -1) return false;
+    if (isalnum(c)) return true;
+    switch (c) {
+    case '-': case '.': case '_': case '~': case ':': case '/': case '@':
+    case '!': case '$': case '&': case '\'': case '(': case ')':
+    case '*': case '+': case ',': case ';': case '=': case '%':
+        return true;
+    }
+    return false;
+}
+
 /* does a token type end a complete operand? (for +/- signed-vs-binary) */
 static bool tok_ends_operand(TokType t, const char *name) {
     switch (t) {
@@ -290,6 +306,29 @@ static Token tokenize(Lexer *lx) {
             }
             /* rewind: not a hash (e.g. sha256:Natural, sha256 : Text) */
             lx->pos = save_pos; lx->line = save_line; lx->col = save_col;
+        }
+        /* scheme:// URL import (http://, https://, ftp://, ...). Recognizes ANY
+           scheme so import.c can reject non-http(s) with a good error.  Only
+           fires when the identifier is immediately followed by "://" — so
+           `a//b` (prefer), `env:NAME`/`missing`/`sha256:` (handled above), and
+           `http : Type` (no //) are all unaffected. */
+        if (cur(lx) == ':' && lx->pos + 2 < lx->len &&
+            lx->src[lx->pos + 1] == '/' && lx->src[lx->pos + 2] == '/') {
+            lexer_read_char(lx);  /* ':' */
+            lexer_read_char(lx);  /* '/' */
+            lexer_read_char(lx);  /* '/' */
+            size_t us = lx->pos;
+            while (is_url_char(cur(lx))) lexer_read_char(lx);
+            size_t ulen = lx->pos - us;
+            size_t nlen = strlen(name);
+            char *spec = arena_alloc(dhall_arena, nlen + 3 + ulen + 1);
+            memcpy(spec, name, nlen);
+            spec[nlen] = ':';
+            spec[nlen + 1] = '/';
+            spec[nlen + 2] = '/';
+            memcpy(spec + nlen + 3, lx->src + us, ulen);
+            spec[nlen + 3 + ulen] = '\0';
+            return emit(lx, T_IMPORT, sp, spec);
         }
         return emit(lx, T_NAME, sp, name);
     }

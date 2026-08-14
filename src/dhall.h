@@ -305,12 +305,29 @@ void import_loader_free(ImportLoader *l);
 /* register the root file (or NULL for stdin) so relative imports resolve
    against its directory and self-import is detected */
 void import_loader_push_root(ImportLoader *l, const char *root_file);
-/* resolve an import spec (./x, ../y, /abs, env:NAME, missing) to a term.
-   hash_hex is NULL when no hash is attached. On error sets *err and returns
-   NULL; an absent import (missing / file-not-found / env-unset) is reported
-   with stage ERR_MISSING. */
+/* resolve an import spec (./x, ../y, /abs, env:NAME, missing, http://...) to a
+   term. hash_hex is NULL when no hash is attached. On error sets *err and
+   returns NULL; an absent import (missing / file-not-found / env-unset /
+   URL-unreachable-or-blocked) is reported with stage ERR_MISSING. */
 Term *import_resolve(ImportLoader *l, const char *spec, const char *hash_hex,
                      Parser *p, DhallError *err);
+
+/* ------------------------------------------------------------------ */
+/* http.c — http:// URL fetch (native only) + URL string helpers      */
+/* ------------------------------------------------------------------ */
+
+/* http_fetch status codes. On HTTP_OK, *body is a NUL-terminated malloc'd
+   buffer and *len its true length (may contain embedded NULs; the sha256 is
+   computed over *len bytes). On HTTP_ABSENT, *err is ERR_MISSING (recoverable);
+   on HTTP_HARD, *err is an unrecoverable stage (ERR_IO). */
+enum { HTTP_OK = 0, HTTP_ABSENT = 1, HTTP_HARD = 2 };
+int http_fetch(const char *url, char **body, size_t *len, DhallError *err);
+
+/* URL string helpers (malloc'd result, caller frees; NULL on OOM).
+   url_dirname("http://h/a/b") -> "http://h/a/"; url_join resolves a (possibly
+   relative) reference against a directory URL ("." stripped, ".." pops). */
+char *url_dirname(const char *url);
+char *url_join(const char *base_dir, const char *spec);
 
 /* ------------------------------------------------------------------ */
 /* parser.c                                                           */

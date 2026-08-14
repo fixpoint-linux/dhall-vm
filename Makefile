@@ -2,14 +2,14 @@ CC := cosmocc
 CFLAGS := -std=c11 -O2 -g -Wall -Wextra
 SRC := src/main.c src/arena.c src/lexer.c src/parser.c src/ast.c \
        src/normalize.c src/typecheck.c src/builtins.c src/serialize.c src/import.c \
-       src/bignum.c src/sha256.c
+       src/bignum.c src/sha256.c src/ssrf.c src/http.c
 # bench links every .c EXCEPT main.c (it has its own main).
 BENCH_SRC := src/bench.c src/arena.c src/lexer.c src/parser.c src/ast.c \
              src/normalize.c src/typecheck.c src/builtins.c src/serialize.c src/import.c \
-             src/bignum.c src/sha256.c
-HDR := src/dhall.h
+             src/bignum.c src/sha256.c src/ssrf.c src/http.c
+HDR := src/dhall.h src/ssrf.h
 
-.PHONY: all test bench clean wasm
+.PHONY: all test bench clean wasm test-ssrf
 
 all: dhall.com
 
@@ -30,8 +30,15 @@ wasm:
 	./scripts/build-wasm.sh
 	@node tests/wasm-smoke.js
 
-test: all
+# Offline unit test for the SSRF classifier + url_parse (src/ssrf.c). This is
+# the security crux: 36 classification vectors + url_parse vectors, deterministic
+# and network-free. Compiled with cosmocc, run, assert exit 0.
+test-ssrf: tests/ssrf_test.c src/ssrf.c src/ssrf.h
+	$(CC) $(CFLAGS) -I src -o /tmp/ssrf_test tests/ssrf_test.c src/ssrf.c
+	/tmp/ssrf_test
+
+test: all test-ssrf
 	./tests/run.sh ./dhall.com.dbg && ./tests/roundtrip.sh ./dhall.com.dbg && ./tests/examples.sh ./dhall.com.dbg && ./tests/cli.sh ./dhall.com.dbg
 
 clean:
-	rm -f dhall.com dhall.com.dbg bench.com bench.com.dbg dhall.aarch64.elf bench.aarch64.elf
+	rm -f dhall.com dhall.com.dbg bench.com bench.com.dbg dhall.aarch64.elf bench.aarch64.elf /tmp/ssrf_test /tmp/ssrf_test.dbg

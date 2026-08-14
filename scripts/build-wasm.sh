@@ -33,7 +33,7 @@ EM_CONFIG="$EMCONF" "$EMCC" -O2 \
   -o "$OUT/dhall.js" \
   src/wasm.c src/arena.c src/lexer.c src/parser.c src/ast.c \
   src/normalize.c src/typecheck.c src/builtins.c src/serialize.c \
-  src/import.c src/bignum.c src/sha256.c
+  src/import.c src/bignum.c src/sha256.c src/http.c
 
 mkdir -p docs
 cp "$OUT/dhall.js" "$OUT/dhall.wasm" docs/ 2>/dev/null || cp "$OUT"/dhall.js "$OUT"/dhall.wasm docs/

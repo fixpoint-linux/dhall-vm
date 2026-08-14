@@ -117,7 +117,8 @@ bidirectional typechecking) includes:
 - **Serializers** — one evaluated value tree renders the same expression to
   **JSON**, **TOML** (top level must be a record), or **YAML** (block style, 1.2
   core schema), reusing a single shared value representation.
-- **Imports** — local file imports and `env:` imports (see below).
+- **Imports** — local file imports, `env:` imports, and `http://` URL imports
+  (see below).
 
 ### Multiline strings and Unicode operators
 
@@ -185,35 +186,81 @@ from Dhall, which needs polymorphism this subset lacks).
 
 ## Imports
 
-Local file imports and environment-variable imports are supported:
+Local file imports, environment-variable imports, and `http://` URL imports are
+supported:
 
 ```
 ./dep.dhall        # relative to the importing file's directory
 ../x.dhall
 /abs/path.dhall
 env:HOME           # the value of $HOME as a Text literal
+http://host/x.dhall sha256:<64hex>
 ```
 
 - Imports are resolved and inlined **at parse time**; the imported
   expression is closed (it cannot reference binders from the importing
   file).
 - Relative paths resolve against the directory of the importing file (the
-  CWD for stdin input).
+  CWD for stdin input). Relative imports **inside a URL document** resolve
+  against that URL's directory (`./dep.dhall`, `../dep.dhall`), never against
+  the local CWD.
 - Import **cycles** are detected and reported (`import cycle`).
-- A per-canonical-path cache gives correct diamond-import sharing.
+- A per-key cache gives correct diamond-import sharing.
 - Import chain depth is capped (`MAX_IMPORT_DEPTH`, 64) — deeper chains
   error instead of overflowing the C stack.
-- **No network imports** (no URL/http) — the interpreter is self-contained
-  and portable. Local imports also support the always-absent `missing`
-  import and a `sha256:<hex>` integrity check.
+- Local imports also support the always-absent `missing` import.
 - `e0 ? e1` (import-fallback, tighter than `with`, looser than `||`) evaluates
   to `e1` when `e0` contains an absent import — a `missing` import, a file that
-  does not exist, or an unset `env:` variable. A failed `sha256:` check, an
-  import cycle, or a parse error is **not** recoverable by `?`.
-- The `sha256:<64 hex>` check is a **documented deviation**: real Dhall hashes
-  the CBOR encoding of the beta-normal form, but dhall-c (which has no CBOR)
-  hashes the **raw source text** (file bytes / env-var value), and the digest
-  is lowercase base16 hex rather than base64.
+  does not exist, an unset `env:` variable, or a URL that is unreachable or
+  blocked. A failed `sha256:` check, an import cycle, an unsupported URL
+  scheme, or a parse error is **not** recoverable by `?`.
+
+### URL imports (http)
+
+`http://` URL imports are supported with a strong security posture:
+
+- **`sha256:` is required** for every remote import (checked before any fetch);
+  an un-hashed URL import is a hard error (`Import of remote URL requires a
+  sha256: hash`). The fetched body is verified against the hash and a mismatch
+  is a hard error.
+- **http-only**: `https://` is recognized but rejected with a hard error
+  (`not supported in this build (no TLS)`) — this build has no TLS. Any other
+  scheme (`ftp://`, `file://`, …) is rejected with `unsupported URL scheme`.
+- **SSRF protection**: the hostname is resolved and the connection is rejected
+  if *any* resolved address is private / loopback / link-local / reserved /
+  multicast (IPv4 and IPv6, including IPv4-mapped IPv6) — this defeats
+  DNS-rebinding. The connection is made only to a validated address, never the
+  hostname string. Unknown address families fail closed.
+- **Redirects** (301/302/303/307/308) are followed up to a cap of 5, and every
+  hop re-validates the scheme, re-resolves, and re-checks SSRF; a redirect to a
+  non-http or blocked address is rejected.
+- **Caps**: a 16 MiB body cap, a 10 s per-operation timeout, and a 30 s overall
+  deadline. `Transfer-Encoding: chunked` is de-chunked (bounds-checked). No
+  request body, cookies, or credentials are sent — only `GET` + a `Host` header.
+- **Absent vs hard**: an unreachable / unresolvable / blocked / timeout /
+  4xx/5xx / redirect-cap-exceeded URL is *absent* and recoverable by `?`.
+  An unsupported scheme, `https://`, a missing or mismatched `sha256:`, or an
+  oversized response is a *hard* error (not recoverable).
+- Query strings and fragments are not supported in URL imports (the `?` and `#`
+  are not part of the import; percent-encode them, or add a trailing path).
+- In the WebAssembly build there is no network access: a URL import is reported
+  absent (`network unavailable`), so `?` can recover it.
+
+### sha256: hash deviation
+
+The `sha256:<64 hex>` check is a **documented deviation**: real Dhall hashes
+the CBOR encoding of the beta-normal form, but dhall-c (which has no CBOR)
+hashes the **raw source text** (file bytes / env-var value / URL response
+body), and the digest is lowercase base16 hex rather than base64. This applies
+to local, `env:`, and URL imports alike.
+
+### Test-only escape
+
+The `DHALL_ALLOW_LOOPBACK=1` environment variable is a **test-only, insecure**
+escape that treats only `127.0.0.0/8` and `::1` as public, so the opt-in live
+test (`tests/url.sh`) can exercise the success fetch path against a localhost
+server. Every other private/link-local/reserved range stays blocked. Do not set
+it in production.
 
 ## Normal forms round-trip via de Bruijn references
 
