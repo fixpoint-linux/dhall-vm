@@ -77,8 +77,12 @@ static double run_loop(int n, int phase, FILE *tmp) {
             if (phase == 2) {
                 if (!infer_type(&p, t, &err)) { fprintf(stderr, "bench: type error: %s\n", err.msg); exit(2); }
             } else {
-                fflush(tmp);
+                /* serialize INTO tmp, then flush so the actual write cost is
+                   included in the timed region; rewind per iteration so the
+                   file doesn't grow unboundedly. */
+                rewind(tmp);
                 if (!term_to_json(tmp, nf, &err)) { fprintf(stderr, "bench: serialize error: %s\n", err.msg); exit(2); }
+                fflush(tmp);
             }
         }
         import_loader_free(loader);
@@ -124,10 +128,15 @@ int main(void) {
         double ops = (double)n[ph] / phases[ph];
         printf("%-22s %12.1f %14.0f\n", names[ph], ns, ops);
     }
-    /* per-phase by subtraction (B-A = normalize, C-B = typecheck, D-B = serialize) */
+    /* per-phase by subtraction (B-A = normalize, C-B = typecheck, D-B = serialize);
+       clamp negatives to 0 — the per-phase averages use different autoscaled n, so
+       cross-phase timing noise can briefly make a derived phase negative. */
     double nrm = ((phases[1] / n[1]) - (phases[0] / n[0])) * NSEC_PER_SEC;
     double tc  = ((phases[2] / n[2]) - (phases[1] / n[1])) * NSEC_PER_SEC;
     double ser = ((phases[3] / n[3]) - (phases[1] / n[1])) * NSEC_PER_SEC;
+    if (nrm < 0) nrm = 0;
+    if (tc < 0) tc = 0;
+    if (ser < 0) ser = 0;
     printf("\nderived per-phase ns/op:\n");
     printf("  normalize  : %12.1f ns/op\n", nrm);
     printf("  typecheck  : %12.1f ns/op\n", tc);

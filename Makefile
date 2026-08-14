@@ -26,4 +26,4 @@ test: all
 	./tests/run.sh ./dhall.com.dbg && ./tests/roundtrip.sh ./dhall.com.dbg && ./tests/examples.sh ./dhall.com.dbg && ./tests/cli.sh ./dhall.com.dbg
 
 clean:
-	rm -f dhall.com dhall.com.dbg bench.com bench.com.dbg
+	rm -f dhall.com dhall.com.dbg bench.com bench.com.dbg dhall.aarch64.elf bench.aarch64.elf
