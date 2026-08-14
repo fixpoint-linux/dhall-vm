@@ -562,9 +562,12 @@ Term *normalize(Term *t) {
         }
         if (match_builtin("List/length", 2, t, args)) {
             Term *xs = normalize(args[1]);
+            Term *cur = xs;
             uint64_t count = 0;
-            for (Term *cur = xs; cur->tag == TmCons; cur = cur->as.cons.tail) count++;
-            return tm_nat(count);
+            while (cur->tag == TmCons) { count++; cur = cur->as.cons.tail; }
+            if (cur->tag == TmNil) return tm_nat(count);
+            /* stuck list (bound var / stuck tail): fall through and leave
+               the application stuck, mirroring List/map/List/reverse */
         }
         Term *f = normalize(t->as.app.fn);
         if (f->tag == TmLam) return normalize(subst(0, t->as.app.arg, f->as.lam.body));

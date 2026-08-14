@@ -231,7 +231,15 @@ static Token tokenize(Lexer *lx) {
     if (is_name_start(c)) {
         size_t start = lx->pos;
         lexer_read_char(lx);
-        while (is_name_char(cur(lx))) lexer_read_char(lx);
+        while (is_name_char(cur(lx))) {
+            /* stop before a '/' that begins the /\\ merge operator, so `b/\\c`
+               lexes as `b` `\\/` `c` rather than identifier `b/` + lambda `\\c`.
+               (a literal '/' inside a name is only ever followed by an alnum,
+               '-' or '_', never '\\'; `\\` is not a name char.) */
+            if (cur(lx) == '/' && lx->pos + 1 < lx->len && lx->src[lx->pos + 1] == '\\')
+                break;
+            lexer_read_char(lx);
+        }
         char *name = arena_strndup(dhall_arena, lx->src + start, lx->pos - start);
         /* env:NAME import: 'env' immediately followed by ':' */
         if (!strcmp(name, "env") && cur(lx) == ':') {
