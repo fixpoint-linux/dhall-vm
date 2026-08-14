@@ -11,6 +11,10 @@
 #   - *.expected.nerr    -> normalize must FAIL and stderr must contain this text
 #   - *.expected.json    -> to-json must succeed and stdout must match
 #   - *.expected.jsonerr -> to-json must FAIL and stderr must contain this text
+#   - *.expected.toml    -> to-toml must succeed and stdout must match
+#   - *.expected.tomlerr -> to-toml must FAIL and stderr must contain this text
+#   - *.expected.yaml    -> to-yaml must succeed and stdout must match
+#   - *.expected.yamlerr -> to-yaml must FAIL and stderr must contain this text
 set -u
 BIN="${1:-./dhall.com.dbg}"
 case "$BIN" in
@@ -126,6 +130,78 @@ check_one() {
             ok=0
         elif ! grep -F -q "$want" "$ERR"; then
             echo "FAIL $name: to-json error mismatch (want: $want)"
+            cat "$ERR"
+            ok=0
+        fi
+    fi
+
+    if [ -f "$base.expected.toml" ]; then
+        if [ "$mode" = file ]; then
+            "$BIN" to-toml "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" to-toml < "$f" >"$OUT" 2>"$ERR"
+        fi
+        rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "FAIL $name: to-toml failed"
+            cat "$ERR"
+            ok=0
+        elif ! cmp -s "$OUT" "$base.expected.toml"; then
+            echo "FAIL $name: to-toml output mismatch"
+            diff "$base.expected.toml" "$OUT"
+            ok=0
+        fi
+    fi
+
+    if [ -f "$base.expected.tomlerr" ]; then
+        if [ "$mode" = file ]; then
+            "$BIN" to-toml "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" to-toml < "$f" >"$OUT" 2>"$ERR"
+        fi
+        rc=$?
+        want="$(cat "$base.expected.tomlerr")"
+        if [ "$rc" -eq 0 ]; then
+            echo "FAIL $name: to-toml should have failed"
+            ok=0
+        elif ! grep -F -q "$want" "$ERR"; then
+            echo "FAIL $name: to-toml error mismatch (want: $want)"
+            cat "$ERR"
+            ok=0
+        fi
+    fi
+
+    if [ -f "$base.expected.yaml" ]; then
+        if [ "$mode" = file ]; then
+            "$BIN" to-yaml "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" to-yaml < "$f" >"$OUT" 2>"$ERR"
+        fi
+        rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "FAIL $name: to-yaml failed"
+            cat "$ERR"
+            ok=0
+        elif ! cmp -s "$OUT" "$base.expected.yaml"; then
+            echo "FAIL $name: to-yaml output mismatch"
+            diff "$base.expected.yaml" "$OUT"
+            ok=0
+        fi
+    fi
+
+    if [ -f "$base.expected.yamlerr" ]; then
+        if [ "$mode" = file ]; then
+            "$BIN" to-yaml "$f" >"$OUT" 2>"$ERR"
+        else
+            "$BIN" to-yaml < "$f" >"$OUT" 2>"$ERR"
+        fi
+        rc=$?
+        want="$(cat "$base.expected.yamlerr")"
+        if [ "$rc" -eq 0 ]; then
+            echo "FAIL $name: to-yaml should have failed"
+            ok=0
+        elif ! grep -F -q "$want" "$ERR"; then
+            echo "FAIL $name: to-yaml error mismatch (want: $want)"
             cat "$ERR"
             ok=0
         fi

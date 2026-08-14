@@ -143,7 +143,7 @@ struct Term {
 /* ------------------------------------------------------------------ */
 
 typedef enum {
-    ERR_NONE = 0, ERR_LEX, ERR_PARSE, ERR_TYPE, ERR_JSON, ERR_IO
+    ERR_NONE = 0, ERR_LEX, ERR_PARSE, ERR_TYPE, ERR_SERIALIZE, ERR_IO
 } ErrorStage;
 
 typedef struct {
@@ -308,9 +308,33 @@ DhallError *normalize_get_error(void);
 Term *infer_type(Parser *p, Term *t, DhallError *err);  /* returns type term or NULL */
 
 /* ------------------------------------------------------------------ */
-/* json.c                                                             */
+/* serialize.c                                                        */
 /* ------------------------------------------------------------------ */
 
+typedef enum { FMT_JSON, FMT_TOML, FMT_YAML } SerFormat;
+
+/* Format-independent value tree built by term_to_value() from the
+   normal form; the JSON/YAML/TOML emitters share it. */
+typedef enum {
+    VK_NULL, VK_NAT, VK_INT, VK_DBL, VK_BOOL, VK_TEXT, VK_ARRAY, VK_TABLE
+} ValueKind;
+typedef struct Value Value;
+struct Value {
+    ValueKind kind;
+    union {
+        uint64_t nat;   /* VK_NAT */
+        int64_t i64;    /* VK_INT */
+        double dbl;     /* VK_DBL */
+        bool b;         /* VK_BOOL */
+        char *text;     /* VK_TEXT */
+        struct { Value **items; int n; } arr;  /* VK_ARRAY */
+        struct { char **keys; Value **vals; int n; } tab; /* VK_TABLE */
+    } as;
+};
+
 bool term_to_json(FILE *out, Term *t, DhallError *err); /* true on success */
+bool term_to_toml(FILE *out, Term *t, DhallError *err); /* true on success */
+bool term_to_yaml(FILE *out, Term *t, DhallError *err); /* true on success */
+bool term_serialize(FILE *out, Term *t, SerFormat fmt, DhallError *err);
 
 #endif /* DHALL_H */

@@ -17,10 +17,12 @@ Requires `cosmocc` (Cosmopolitan toolchain).
 dhall typecheck [file|-]   # infer the type of an expression
 dhall normalize [file|-]   # print the normal form
 dhall to-json   [file|-]   # evaluate to JSON
+dhall to-toml   [file|-]   # evaluate to TOML (top level must be a record)
+dhall to-yaml   [file|-]   # evaluate to YAML (block style, 1.2 core schema)
 ```
 
 Input is read from a file or stdin. Exit codes: `0` ok, `1` type error,
-`2` parse/lex error, `3` internal/IO/JSON error. Type errors report
+`2` parse/lex error, `3` internal/IO/serialize error. Type errors report
 `Error: <msg> (at <file>:<line>:<col>)`.
 
 ## Language features
@@ -43,9 +45,9 @@ bidirectional typechecking) includes:
   `Natural/isZero`, `Natural/show`, `Natural/subtract`, `Natural/fold`.
 - **Assertions** — `assert : body` where `body : Bool` and normalizes to
   `True`. Note: the assertion is enforced during `typecheck`; the
-  `normalize` and `to-json` modes do not typecheck first, so `assert : False`
-  there evaluates to `true` without an error (always typecheck first to rely
-  on the guarantee).
+  `normalize` and serializer (`to-json`/`to-toml`/`to-yaml`) modes do not
+  typecheck first, so `assert : False` there evaluates to `true` without an
+  error (always typecheck first to rely on the guarantee).
 - **Imports** — local file imports and `env:` imports (see below).
 
 ### Arithmetic semantics
@@ -128,8 +130,8 @@ annotations, record/union field types), so higher-order normal forms — e.g.
 
 ## Known limitation: stuck text interpolation
 
-`normalize` and `to-json` modes reject interpolation of a **closed non-Text**
-value (e.g. `"${1+2}"` or `"${True}"`) with `interpolation requires Text`. However,
+`normalize` and the serializer (`to-json`/`to-toml`/`to-yaml`) modes reject
+interpolation of a **closed non-Text** value (e.g. `"${1+2}"` or `"${True}"`) with `interpolation requires Text`. However,
 a **stuck** interpolation whose value is a bound variable of type Text (e.g.
 `\(x : Text) -> "${x}"`) is still silently dropped, producing `\(_ : Text) -> ""`.
 This is a known limitation (a faithful fix would require preserving interpolated

@@ -64,7 +64,7 @@ static bool text_has_interp(Term *t) {
 }
 
 /* true if the normalized value is a closed WHNF that is definitively NOT Text.
-   Used to reject non-Text interpolation in normalize/to-json modes (which have
+   Used to reject non-Text interpolation in normalize/serializer modes (which have
    no type information). Stuck/unknown-type terms (TmVar, TmApp, TmField, ...)
    are left to the existing behavior (silently dropped), matching well-typed
    semantics where bound-Text interpolations may remain stuck. */

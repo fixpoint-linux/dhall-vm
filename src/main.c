@@ -2,9 +2,11 @@
      dhall typecheck [file|-]
      dhall normalize [file|-]
      dhall to-json   [file|-]
+     dhall to-toml   [file|-]
+     dhall to-yaml   [file|-]
    Reads source from stdin or a file. Prints the inferred type (typecheck),
-   the normal form (normalize), or JSON (to-json). Exit codes: 0 ok,
-   1 type error, 2 parse/lex error, 3 internal/IO/JSON. */
+   the normal form (normalize), or a serialized form (to-json/to-toml/to-yaml).
+   Exit codes: 0 ok, 1 type error, 2 parse/lex error, 3 internal/IO/serialize. */
 #include "dhall.h"
 
 static char *read_all(FILE *f, size_t *len_out) {
@@ -35,15 +37,17 @@ static void print_error(const DhallError *e) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "usage: %s typecheck|normalize|to-json [file|-]\n", argv[0]);
+        fprintf(stderr, "usage: %s typecheck|normalize|to-json|to-toml|to-yaml [file|-]\n", argv[0]);
         return 3;
     }
     const char *mode = argv[1];
     bool want_typecheck = !strcmp(mode, "typecheck");
     bool want_normalize = !strcmp(mode, "normalize");
     bool want_json = !strcmp(mode, "to-json");
-    if (!want_typecheck && !want_normalize && !want_json) {
-        fprintf(stderr, "Error: unknown mode '%s' (expected typecheck|normalize|to-json)\n", mode);
+    bool want_toml = !strcmp(mode, "to-toml");
+    bool want_yaml = !strcmp(mode, "to-yaml");
+    if (!want_typecheck && !want_normalize && !want_json && !want_toml && !want_yaml) {
+        fprintf(stderr, "Error: unknown mode '%s' (expected typecheck|normalize|to-json|to-toml|to-yaml)\n", mode);
         return 3;
     }
 
@@ -115,9 +119,17 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    /* to-json */
-    if (!term_to_json(stdout, nf, &err)) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
-    fputc('\n', stdout);
+    /* serializers: to-json / to-toml / to-yaml */
+    if (want_json) {
+        if (!term_to_json(stdout, nf, &err)) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
+        fputc('\n', stdout); /* JSON is single-line; the serializer adds no trailing newline */
+    } else if (want_toml) {
+        if (!term_to_toml(stdout, nf, &err)) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
+        /* TOML output carries its own trailing newline */
+    } else if (want_yaml) {
+        if (!term_to_yaml(stdout, nf, &err)) { print_error(&err); import_loader_free(loader); return dhall_error_exit(&err); }
+        /* YAML output carries its own trailing newline */
+    }
     import_loader_free(loader);
     return 0;
 }

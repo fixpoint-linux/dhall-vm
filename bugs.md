@@ -29,7 +29,7 @@ pure literal is skipped, so a bound `Text` variable (which normalizes to a
 
 **Scope of a correct fix (deliberately NOT attempted):** proper *partial splice*
 — rebuild the `TextPart` list keeping non-literal interpolation parts intact
-instead of dropping them, and make `print_term` / `json.c` emit preserved
+instead of dropping them, and make `print_term` / `serialize.c` emit preserved
 interpolation (e.g. `"${_0}"`). That bleeds into the `_N` round-trip machinery
 and is a larger, riskier change.
 
