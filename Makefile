@@ -9,7 +9,7 @@ BENCH_SRC := src/bench.c src/arena.c src/lexer.c src/parser.c src/ast.c \
              src/bignum.c
 HDR := src/dhall.h
 
-.PHONY: all test bench clean
+.PHONY: all test bench clean wasm
 
 all: dhall.com
 
@@ -21,6 +21,14 @@ bench: bench.com
 
 bench.com: $(BENCH_SRC) $(HDR)
 	$(CC) $(CFLAGS) -o bench.com $(BENCH_SRC)
+
+# Build the interpreter to wasm (emscripten) for the GitHub Pages demo in docs/.
+# Requires: pacman -S emscripten clang lld llvm  (see scripts/build-wasm.sh).
+# docs/dhall.js + docs/dhall.wasm are committed site assets (Pages serves them
+# with zero CI), so they are NOT removed by `make clean`.
+wasm:
+	./scripts/build-wasm.sh
+	@node tests/wasm-smoke.js
 
 test: all
 	./tests/run.sh ./dhall.com.dbg && ./tests/roundtrip.sh ./dhall.com.dbg && ./tests/examples.sh ./dhall.com.dbg && ./tests/cli.sh ./dhall.com.dbg

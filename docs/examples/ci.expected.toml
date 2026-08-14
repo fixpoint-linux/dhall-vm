@@ -1,0 +1,4 @@
+jobs = [{ image = "golang:1.22", name = "build", steps = ["git clone", "go build"], timeout = 3600 }, { image = "node:20", name = "test", steps = ["npm ci", "npm test"], timeout = 1800 }]
+matrix = [{ os = "ubuntu-22.04" }, { os = "macos-14" }]
+name = "dhall-c ci"
+on = "push"

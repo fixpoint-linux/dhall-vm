@@ -1,0 +1,3 @@
+# emscripten cache created under the project root when EM_CONFIG points CACHE
+# at a relative/expanded-home path during a wasm build; regenerate, don't commit.
+.cache/

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dhall-c — a subset of Dhall, in C, running in your browser</title>
+  <meta name="description" content="dhall-c is a pure-C subset interpreter for the Dhall configuration language. This page runs it as WASM, in your browser — no server.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <span class="logo">dhall<span class="logo-accent">-c</span></span>
+      <nav>
+        <a href="#demo">Live demo</a>
+        <a href="#features">Features</a>
+        <a href="#examples">Examples</a>
+        <a href="#benchmark">Benchmark</a>
+        <a href="#quickstart">Quickstart</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <h1>A subset of <span class="accent">Dhall</span>, written in <span class="accent">C</span>.</h1>
+      <p class="lead">
+        Typecheck, normalize, and serialize Dhall configuration — right here, in your browser,
+        compiled to <strong>WebAssembly</strong>. No server, no build step, no upload:
+        your code never leaves this tab.
+      </p>
+      <ul class="badges">
+        <li>WASM · runs 100% client-side</li>
+        <li>Pure C11, zero dependencies</li>
+        <li>Single static page on GitHub Pages</li>
+      </ul>
+      <a class="btn" href="#demo">Try it now ↓</a>
+    </div>
+  </section>
+
+  <section class="section" id="demo">
+    <div class="wrap">
+      <h2>Live demo</h2>
+      <p class="sub">Pick a mode, then edit the source. Press <kbd>Run</kbd> or <kbd>Ctrl/⌘+Enter</kbd>.</p>
+
+      <div class="demo">
+        <div class="demo-bar">
+          <div class="modes" id="modes" role="tablist">
+            <button data-mode="0" class="mode active" role="tab" aria-selected="true">typecheck</button>
+            <button data-mode="1" class="mode" role="tab">normalize</button>
+            <button data-mode="2" class="mode" role="tab">to-json</button>
+            <button data-mode="3" class="mode" role="tab">to-toml</button>
+            <button data-mode="4" class="mode" role="tab">to-yaml</button>
+          </div>
+          <button class="btn run" id="runBtn">Run</button>
+        </div>
+
+        <div class="panes">
+          <div class="pane">
+            <label for="source">Dhall source</label>
+            <textarea id="source" spellcheck="false" autocomplete="off"
+              placeholder="{ greeting = \"Hello, \" ++ \"world!\", count = 1 + 2 }"></textarea>
+          </div>
+          <div class="pane">
+            <label for="output">Result</label>
+            <textarea id="output" readonly spellcheck="false"></textarea>
+          </div>
+        </div>
+
+        <div class="demo-foot">
+          <span class="status" id="status">loading WASM…</span>
+          <div class="examples" id="examplesChips"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" id="features">
+    <div class="wrap">
+      <h2>What it does</h2>
+      <div class="grid">
+        <div class="card"><h3>Typecheck</h3><p>Bidirectional inference with helpful <code>Error: … at line N, col M</code> messages.</p></div>
+        <div class="card"><h3>Normalize</h3><p>Eager, step-sound normal forms for a single-term de&nbsp;Br&#252;ijn core.</p></div>
+        <div class="card"><h3>Serializers</h3><p>One value tree → <strong>JSON</strong>, <strong>TOML</strong>, and <strong>YAML</strong> output.</p></div>
+        <div class="card"><h3>Imports</h3><p><code>./x</code> and <code>env:NAME</code> (file imports disabled in the browser).</p></div>
+        <div class="card"><h3>Optional / Some</h3><p><code>Some</code>, <code>None</code>, and pattern-free optional handling.</p></div>
+        <div class="card"><h3>Arithmetic</h3><p><code>Natural</code> arithmetic on <strong>arbitrary-precision</strong> big ints.</p></div>
+        <div class="card"><h3>assert</h3><p><code>assert :</code> type-level checks that fail fast.</p></div>
+        <div class="card"><h3>toMap</h3><p>Turn record field sets into <code>List</code> map entries.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="examples">
+    <div class="wrap">
+      <h2>Examples</h2>
+      <p class="sub">Click one to load it into the demo (fetched from <code>examples/</code>).</p>
+      <div class="ex-cards" id="exCards"></div>
+    </div>
+  </section>
+
+  <section class="section alt" id="benchmark">
+    <div class="wrap">
+      <h2>Benchmark</h2>
+      <p class="sub">
+        Representative per-phase timings over a ~20-field nested record, a 200-element list,
+        a <code>let</code>/lambda, and a <code>merge</code>. Built with <code>make bench</code>
+        (<code>bench.com.dbg</code>, x86-64).
+      </p>
+      <table class="bench">
+        <thead><tr><th>phase</th><th>ns/op</th><th>ops/s</th></tr></thead>
+        <tbody>
+          <tr><td>parse</td><td>23,080</td><td>43,327</td></tr>
+          <tr><td>normalize</td><td>277,351</td><td>3,606</td></tr>
+          <tr><td>typecheck</td><td>16,721</td><td>59,805</td></tr>
+          <tr><td>serialize (to-json)</td><td>28,977</td><td>34,510</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" id="quickstart">
+    <div class="wrap">
+      <h2>Quickstart</h2>
+      <p>Build the native binary (a Cosmopolitan <code>APE</code>) and run the whole test suite:</p>
+      <pre><code>make            # dhall.com (APE) + dhall.com.dbg (ELF)
+make test       # run.sh + roundtrip.sh + examples.sh + cli.sh</code></pre>
+      <p>Usage:</p>
+      <pre><code>dhall typecheck [file|-]   # infer the type of an expression
+dhall normalize [file|-]   # print the normal form
+dhall to-json   [file|-]   # evaluate to JSON
+dhall to-toml   [file|-]   # evaluate to TOML (top level must be a record)
+dhall to-yaml   [file|-]   # evaluate to YAML (block style, 1.2 core schema)</code></pre>
+      <p>Rebuild the in-browser WASM (requires <code>emscripten clang lld llvm</code>):</p>
+      <pre><code>make wasm            # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
+node tests/wasm-smoke.js   # headless browser-API smoke test (6 checks)</code></pre>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>dhall-c — a pure-C subset of the <a href="https://dhall-lang.org/">Dhall</a> configuration language.
+      This page is the interpreter itself compiled to WebAssembly and served statically from <code>docs/</code>.</p>
+    </div>
+  </footer>
+
+  <script src="dhall.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

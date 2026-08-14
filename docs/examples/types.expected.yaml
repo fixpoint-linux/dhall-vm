@@ -1,0 +1,19 @@
+arithmetic: 5
+comparisons:
+  eq: true
+  lt: true
+mapped:
+  - 2
+  - 4
+  - 6
+optional:
+  none: null
+  some: 42
+origin:
+  x: 0
+  y: 0
+scalars:
+  flag: true
+  greeting: hello
+  n: 10
+status: active

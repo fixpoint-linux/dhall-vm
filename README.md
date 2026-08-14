@@ -64,6 +64,26 @@ correctness check, and is deliberately **not** part of `make all` or
 internal API and tracks `dhall.h`, so an API change may require a rebuild of
 `make bench`.
 
+### In-browser (WebAssembly) demo
+
+The interpreter is also compiled to **WebAssembly** and shipped as a static
+GitHub Pages site under `docs/` (the interpreter runs 100% client-side — your
+code never leaves the browser). Build it with:
+
+```
+make wasm           # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
+node tests/wasm-smoke.js   # headless browser-API smoke test (run by `make wasm`)
+```
+
+`make wasm` needs `emscripten clang lld llvm` (on Arch: `pacman -S emscripten
+clang lld llvm`; see `scripts/build-wasm.sh` for the exact install/config
+quirks). The built `docs/dhall.js` + `docs/dhall.wasm` are committed so GitHub
+Pages can serve the live demo with zero CI: enable Pages → "Deploy from a
+branch" → `main` → `/docs`. The site (`docs/index.html`) typechecks, normalizes,
+and serializes (JSON/TOML/YAML) Dhall expressions in a textarea, and loads the
+`examples/*.dhall` files. `src/wasm.c` provides the browser-callable entry point
+and is deliberately kept out of the native cosmocc build (`Makefile` `SRC`).
+
 ## Language features
 
 The supported subset (single-term de Bruijn core, eager normalization,
