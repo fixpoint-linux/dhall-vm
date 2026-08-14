@@ -151,6 +151,40 @@ static void toml_key(FILE *out, const char *k) {
     if (bare) fputs(k, out); else qstr(out, k);
 }
 
+/* Like toml_key but into a (quoted-or-bare) arena string, for table headers. */
+static char *toml_key_str(const char *k) {
+    bool bare = *k != '\0';
+    if (bare) for (const unsigned char *p = (const unsigned char *)k; *p; p++)
+        if (!(isalnum(*p) || *p == '_' || *p == '-')) { bare = false; break; }
+    if (bare && (!strcmp(k, "true") || !strcmp(k, "false") || !strcmp(k, "inf") || !strcmp(k, "nan"))) bare = false;
+    if (bare) return arena_strdup(dhall_arena, k);
+    size_t len = 2;
+    for (const unsigned char *p = (const unsigned char *)k; *p; p++)
+        len += (*p == '"' || *p == '\\' || *p == '\b' || *p == '\f' ||
+                *p == '\n' || *p == '\r' || *p == '\t') ? 2 : (*p < 0x20 ? 6 : 1);
+    char *out = arena_alloc(dhall_arena, len + 1);
+    char *q = out;
+    *q++ = '"';
+    for (const unsigned char *p = (const unsigned char *)k; *p; p++) {
+        switch (*p) {
+        case '"':  *q++ = '\\'; *q++ = '"';  break;
+        case '\\': *q++ = '\\'; *q++ = '\\'; break;
+        case '\b': *q++ = '\\'; *q++ = 'b';  break;
+        case '\f': *q++ = '\\'; *q++ = 'f';  break;
+        case '\n': *q++ = '\\'; *q++ = 'n';  break;
+        case '\r': *q++ = '\\'; *q++ = 'r';  break;
+        case '\t': *q++ = '\\'; *q++ = 't';  break;
+        default:
+            if (*p < 0x20) q += sprintf(q, "\\u%04x", *p);
+            else *q++ = *p;
+            break;
+        }
+    }
+    *q++ = '"';
+    *q = '\0';
+    return out;
+}
+
 /* ---------------- JSON emitter ---------------- */
 
 static void json_value(FILE *out, const Value *v) {
@@ -191,13 +225,17 @@ static bool yaml_plain_ok(const char *s) {
     const char *lead = "-?:,[]{}#&*!|>'\"%@`";
     if (strchr(lead, *s)) return false;
     size_t n = strlen(s);
-    if (s[n - 1] == ' ' || s[n - 1] == '\t') return false;
+    if (s[n - 1] == ' ' || s[n - 1] == '\t' || s[n - 1] == ':') return false;
     if (strchr(s, '\n') || strchr(s, '\t')) return false;
     if (strstr(s, ": ") || strstr(s, " #")) return false;
     for (const unsigned char *p = (const unsigned char *)s; *p; p++) if (*p < 0x20) return false;
     static const char *res[] = { "null", "~", "true", "false", "True", "False", "TRUE", "FALSE", "Null", "NULL" };
     for (unsigned i = 0; i < sizeof res / sizeof *res; i++) if (!strcmp(s, res[i])) return false;
     char *end; (void)strtod(s, &end); if (end && *end == '\0' && end != s) return false;
+    /* YAML 1.2 core-schema ints strtod does not recognize: 0o octal (and
+       0x/0b hex/binary on libcs where strtod needs a 'p' exponent). */
+    if (n >= 3 && s[0] == '0' && (s[1] == 'o' || s[1] == 'O' || s[1] == 'x' || s[1] == 'X' || s[1] == 'b' || s[1] == 'B'))
+        return false;
     return true;
 }
 
@@ -319,10 +357,11 @@ static bool toml_table(FILE *out, const Value *v, const char *prefix, DhallError
         }
     for (int i = 0; i < v->as.tab.n; i++)
         if (v->as.tab.vals[i]->kind == VK_TABLE) {
-            size_t klen = strlen(v->as.tab.keys[i]);
+            char *krend = toml_key_str(v->as.tab.keys[i]);
+            size_t klen = strlen(krend);
             char *hdr = arena_alloc(dhall_arena, plen + klen + 1);
             memcpy(hdr, prefix, plen);
-            memcpy(hdr + plen, v->as.tab.keys[i], klen + 1);
+            memcpy(hdr + plen, krend, klen + 1);
             fprintf(out, "[%s]\n", hdr);
             char *np = arena_alloc(dhall_arena, plen + klen + 2);
             memcpy(np, hdr, plen + klen);
