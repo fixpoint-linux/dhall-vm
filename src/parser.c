@@ -90,6 +90,7 @@ static Term *parse_application(Parser *p);
 static Term *parse_field(Parser *p);
 static Term *parse_atom(Parser *p);
 static Term *parse_text(Parser *p);
+static Term *parse_text_multiline(Parser *p);
 static Term *parse_record(Parser *p);
 static Term *parse_union(Parser *p);
 static Term *parse_list(Parser *p);
@@ -104,7 +105,7 @@ static bool can_start_atom(Parser *p) {
     Token t = peek(p);
     switch (t.type) {
     case T_NAME: return t.name && !is_keyword(t.name);
-    case T_NAT: case T_INT: case T_DBL: case T_STR_OPEN:
+    case T_NAT: case T_INT: case T_DBL: case T_STR_OPEN: case T_STR_OPEN_MULTILINE:
     case T_LPAREN: case T_LBRACE: case T_LANGLE: case T_LBRACKET:
     case T_LAMBDA: case T_IMPORT:
         return true;
@@ -409,6 +410,7 @@ static Term *parse_atom(Parser *p) {
     case T_INT: next(p); return tloc(tm_int(t.c.i64), t.span);
     case T_DBL: next(p); return tloc(tm_dbl(t.c.dbl), t.span);
     case T_STR_OPEN: return parse_text(p);
+    case T_STR_OPEN_MULTILINE: return parse_text_multiline(p);
     case T_LAMBDA: return parse_lambda(p);
     case T_IMPORT: {
         if (!p->loader) { perr(p, t.span, "imports are not available"); return NULL; }
@@ -556,6 +558,226 @@ static Term *parse_text(Parser *p) {
         open = true;
     }
     text_add_part(p, &buf, &open, &head, &tail);
+    if (!head) return tloc(tm_text_lit(""), sp);
+    return tloc(tm_text(head), sp);
+}
+
+/* ---------- multiline string literal ('' ... '') ---------- */
+
+/* Desugars Dhall single-quoted multiline Text literals to an ordinary TmText
+   at parse time, so normalize/typecheck/serialize need no change. Semantics
+   follow the Dhall standard (standard/multiline.md):
+     * a mandatory newline (\n or \r\n) right after the opening '' is dropped;
+     * inside content: ''' -> literal '', ''${ -> literal ${ (escaped, no
+       interpolation), ${ -> real interpolation, a lone ' is literal, and
+       backslash is literal (no \n/\t escape processing);
+     * \r\n -> \n (a lone \r is literal);
+     * the common leading indent (spaces+tabs) over all non-blank lines plus
+       the last line is stripped from every line, then lines are rejoined
+       with \n. */
+
+typedef struct {
+    const char *pfx;   /* leading space/tab prefix (points into arena literals) */
+    int plen;          /* length of that prefix */
+    bool blank;        /* line has zero chars and no interpolation */
+} MLine;
+
+static void mline_push(MLine **lines, int *n, int *cap,
+                       const char *pfx, int plen, bool blank) {
+    if (*n == *cap) {
+        *cap = *cap ? *cap * 2 : 16;
+        *lines = realloc(*lines, (size_t)*cap * sizeof(MLine));
+    }
+    (*lines)[*n].pfx = pfx;
+    (*lines)[*n].plen = plen;
+    (*lines)[*n].blank = blank;
+    (*n)++;
+}
+
+/* Number of leading characters to strip: the longest common prefix of
+   spaces+tabs over all non-blank lines plus the last line. */
+static int multiline_indent_len(TextPart *head) {
+    MLine *lines = NULL;
+    int n = 0, cap = 0;
+
+    bool line_blank = true;      /* current line has no chars and no interp */
+    bool indent_done = false;    /* current line's leading indent is finalized */
+    const char *line_pfx = NULL; /* start of the leading space/tab run */
+    int line_plen = 0;
+
+    for (TextPart *p = head; p; p = p->next) {
+        if (p->expr) {
+            if (!indent_done) indent_done = true;  /* interpolation interrupts indent */
+            line_blank = false;
+            continue;
+        }
+        const char *s = p->lit;
+        for (int i = 0; s[i]; i++) {
+            char c = s[i];
+            if (c == '\n') {
+                mline_push(&lines, &n, &cap, line_pfx, line_plen, line_blank);
+                line_blank = true; indent_done = false; line_pfx = NULL; line_plen = 0;
+            } else {
+                line_blank = false;
+                if (!indent_done) {
+                    if (c == ' ' || c == '\t') {
+                        if (!line_pfx) line_pfx = s + i;
+                        line_plen++;
+                    } else {
+                        indent_done = true;
+                    }
+                }
+            }
+        }
+    }
+    mline_push(&lines, &n, &cap, line_pfx, line_plen, line_blank);
+
+    const char *common = NULL;
+    int common_len = 0;
+    bool have = false;
+    for (int i = 0; i < n; i++) {
+        if (lines[i].blank && i != n - 1) continue;  /* blank lines don't count, except last */
+        if (!have) {
+            common = lines[i].pfx; common_len = lines[i].plen; have = true;
+        } else {
+            int m = common_len < lines[i].plen ? common_len : lines[i].plen;
+            int j = 0;
+            while (j < m && common[j] == lines[i].pfx[j]) j++;
+            common_len = j;
+        }
+    }
+    int k = have ? common_len : 0;
+    free(lines);
+    return k;
+}
+
+/* Rebuild the content as a TextPart list, dropping `k` leading characters from
+   every line (those chars are always spaces/tabs within the line's first
+   literal segment, and k never exceeds a line's leading indent). */
+static TextPart *multiline_strip(TextPart *head, int k) {
+    TmpBuf buf; tmpbuf_init(&buf);
+    bool open = false;
+    TextPart *out = NULL, *otail = NULL;
+    int remaining = k;
+
+    for (TextPart *p = head; p; p = p->next) {
+        if (p->expr) {
+            text_add_part(NULL, &buf, &open, &out, &otail);
+            text_add_expr(NULL, p->expr, &out, &otail);
+            continue;
+        }
+        const char *s = p->lit;
+        for (int i = 0; s[i]; i++) {
+            char c = s[i];
+            if (c == '\n') {
+                tmpbuf_addc(&buf, '\n');
+                open = true;
+                remaining = k;
+            } else if (remaining > 0) {
+                remaining--;
+            } else {
+                tmpbuf_addc(&buf, c);
+                open = true;
+            }
+        }
+    }
+    text_add_part(NULL, &buf, &open, &out, &otail);
+    return out;
+}
+
+static Term *parse_text_multiline(Parser *p) {
+    SourceSpan sp = peek(p).span;
+    next(p); /* consume T_STR_OPEN_MULTILINE */
+
+    /* Mandatory newline after the opening '' (dropped, not content). */
+    {
+        int c = lexer_peek_char(&p->lx);
+        if (c == '\n') {
+            lexer_read_char(&p->lx);
+        } else if (c == '\r') {
+            lexer_read_char(&p->lx);
+            if (lexer_peek_char(&p->lx) != '\n') {
+                perr(p, sp, "multiline string must begin with a newline after ''");
+                return NULL;
+            }
+            lexer_read_char(&p->lx);
+        } else {
+            perr(p, sp, "multiline string must begin with a newline after ''");
+            return NULL;
+        }
+    }
+
+    TmpBuf buf; tmpbuf_init(&buf);
+    bool open = false;
+    TextPart *head = NULL, *tail = NULL;
+
+    for (;;) {
+        int c = lexer_peek_char(&p->lx);
+        if (c == -1) { perr(p, sp, "unterminated multiline string"); return NULL; }
+
+        if (c == '\'') {
+            const char *s = p->lx.src;
+            size_t pos = p->lx.pos, len = p->lx.len;
+            int c1 = (pos + 1 < len) ? (unsigned char)s[pos + 1] : -1;
+            int c2 = (pos + 2 < len) ? (unsigned char)s[pos + 2] : -1;
+            int c3 = (pos + 3 < len) ? (unsigned char)s[pos + 3] : -1;
+            if (c1 == '\'' && c2 == '\'') {             /* ''' -> literal '' */
+                lexer_read_char(&p->lx); lexer_read_char(&p->lx); lexer_read_char(&p->lx);
+                tmpbuf_addc(&buf, '\''); tmpbuf_addc(&buf, '\'');
+                open = true;
+                continue;
+            }
+            if (c1 == '\'' && c2 == '$' && c3 == '{') { /* ''${ -> literal ${ */
+                lexer_read_char(&p->lx); lexer_read_char(&p->lx);
+                lexer_read_char(&p->lx); lexer_read_char(&p->lx);
+                tmpbuf_addc(&buf, '$'); tmpbuf_addc(&buf, '{');
+                open = true;
+                continue;
+            }
+            if (c1 == '\'') {                            /* '' -> end of literal */
+                lexer_read_char(&p->lx); lexer_read_char(&p->lx);
+                break;
+            }
+            lexer_read_char(&p->lx);                     /* lone ' is literal */
+            tmpbuf_addc(&buf, '\'');
+            open = true;
+            continue;
+        }
+
+        if (c == '$' && p->lx.pos + 1 < p->lx.len && p->lx.src[p->lx.pos + 1] == '{') {
+            lexer_read_char(&p->lx); /* $ */
+            lexer_read_char(&p->lx); /* { */
+            text_add_part(p, &buf, &open, &head, &tail);
+            p->lx.after_operand = false;
+            Term *expr = parse_term(p);
+            if (!expr) return NULL;
+            Token cl = lexer_next(&p->lx);
+            if (cl.type != T_RBRACE) { perr(p, cl.span, "expected '}' to close interpolation"); return NULL; }
+            text_add_expr(p, expr, &head, &tail);
+            continue;
+        }
+
+        if (c == '\r') {
+            if (p->lx.pos + 1 < p->lx.len && p->lx.src[p->lx.pos + 1] == '\n') {
+                lexer_read_char(&p->lx); lexer_read_char(&p->lx);
+                tmpbuf_addc(&buf, '\n');
+            } else {
+                lexer_read_char(&p->lx);
+                tmpbuf_addc(&buf, '\r');
+            }
+            open = true;
+            continue;
+        }
+
+        lexer_read_char(&p->lx);
+        tmpbuf_addc(&buf, (char)c);
+        open = true;
+    }
+    text_add_part(p, &buf, &open, &head, &tail);
+    if (!head) return tloc(tm_text_lit(""), sp);
+
+    int k = multiline_indent_len(head);
+    head = multiline_strip(head, k);
     if (!head) return tloc(tm_text_lit(""), sp);
     return tloc(tm_text(head), sp);
 }

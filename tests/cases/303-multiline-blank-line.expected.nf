@@ -1,0 +1,1 @@
+"foo\n\nbar\n"

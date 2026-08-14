@@ -53,6 +53,21 @@ bidirectional typechecking) includes:
   error (always typecheck first to rely on the guarantee).
 - **Imports** — local file imports and `env:` imports (see below).
 
+### Multiline strings and Unicode operators
+
+- **Multiline `Text`** literals use two single quotes (Dhall `'' ... ''` —
+  *not* `"""` and *not* `'''`): an opening `''`, a mandatory newline, the
+  content, and a closing `''`. They desugar to ordinary double-quoted `Text`
+  at parse time, with standard-Dhall indentation stripping (longest common
+  space/tab prefix over all non-blank lines plus the last line), `'''` →
+  `''` and `''${` → `${` escaping, real `${}` interpolation, and `\r\n` →
+  `\n`. `normalize` prints the desugared double-quoted form
+  (e.g. `''` + newline + `  foo` + newline + `  ''` normalizes to `"foo\n"`),
+  which re-parses and round-trips.
+- **Unicode operators** `λ` (U+03BB) and `→` (U+2192) are accepted as
+  alternatives to `\` and `->` (the ASCII forms still work). Other Unicode
+  operator glyphs (`∀`, `∧`, `⫽`, `≡`, …) are not yet supported.
+
 ### Arithmetic semantics
 
 - `+ - *` require both operands to be the same scalar type

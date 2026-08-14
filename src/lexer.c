@@ -98,7 +98,7 @@ static bool tok_ends_operand(TokType t, const char *name) {
     switch (t) {
     case T_NAT: case T_INT: case T_DBL:
     case T_RPAREN: case T_RBRACKET: case T_RBRACE: case T_RANGLE:
-    case T_IMPORT: case T_STR_OPEN:
+    case T_IMPORT: case T_STR_OPEN: case T_STR_OPEN_MULTILINE:
         return true;
     case T_NAME:
         /* A keyword never ends an operand, and a builtin (a function value)
@@ -132,6 +132,13 @@ static Token tokenize(Lexer *lx) {
 
     /* string */
     if (c == '"') { lexer_read_char(lx); return emit(lx, T_STR_OPEN, sp, NULL); }
+
+    /* multiline string opener ('' — two single quotes, not """ or ''') */
+    if (c == '\'' && lx->pos + 1 < lx->len && lx->src[lx->pos + 1] == '\'') {
+        lexer_read_char(lx);
+        lexer_read_char(lx);
+        return emit(lx, T_STR_OPEN_MULTILINE, sp, NULL);
+    }
 
     /* number: +n / -n / 0 -> Integer; digits -> Natural/Double.
        A +/- is a signed-literal prefix only when NOT after an operand. */
@@ -274,6 +281,24 @@ static Token tokenize(Lexer *lx) {
         while (is_import_path_char(cur(lx))) lexer_read_char(lx);
         char *spec = arena_strndup(dhall_arena, lx->src + start, lx->pos - start);
         return emit(lx, T_IMPORT, sp, spec);
+    }
+
+    /* Unicode operator glyphs (UTF-8): λ U+03BB -> lambda, → U+2192 -> arrow.
+       Emit the existing T_LAMBDA/T_ARROW tokens so the parser needs no change.
+       These bytes are not matched by is_name_start (C locale isalpha < 0x80),
+       and they never collide with the /\\ merge special-case. */
+    if (c == 0xCE && lx->pos + 1 < lx->len && (unsigned char)lx->src[lx->pos + 1] == 0xBB) {
+        lexer_read_char(lx);
+        lexer_read_char(lx);
+        return emit(lx, T_LAMBDA, sp, NULL);
+    }
+    if (c == 0xE2 && lx->pos + 2 < lx->len &&
+        (unsigned char)lx->src[lx->pos + 1] == 0x86 &&
+        (unsigned char)lx->src[lx->pos + 2] == 0x92) {
+        lexer_read_char(lx);
+        lexer_read_char(lx);
+        lexer_read_char(lx);
+        return emit(lx, T_ARROW, sp, NULL);
     }
 
     /* symbols */

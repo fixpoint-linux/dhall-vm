@@ -220,7 +220,7 @@ Term *builtin_type_schema(const char *name);   /* de Bruijn type schema; NULL if
 /* ------------------------------------------------------------------ */
 
 typedef enum {
-    T_EOF, T_NAT, T_INT, T_DBL, T_STR_OPEN, T_NAME,
+    T_EOF, T_NAT, T_INT, T_DBL, T_STR_OPEN, T_STR_OPEN_MULTILINE, T_NAME,
     T_LAMBDA,   /* \ */
     T_ARROW,    /* -> */
     T_COLON, T_EQUALS, T_COMMA, T_DOT,
