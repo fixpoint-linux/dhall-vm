@@ -77,12 +77,14 @@ node tests/wasm-smoke.js   # headless browser-API smoke test (run by `make wasm`
 
 `make wasm` needs `emscripten clang lld llvm` (on Arch: `pacman -S emscripten
 clang lld llvm`; see `scripts/build-wasm.sh` for the exact install/config
-quirks). The built `docs/dhall.js` + `docs/dhall.wasm` are committed so GitHub
-Pages can serve the live demo with zero CI: enable Pages → "Deploy from a
-branch" → `main` → `/docs`. The site (`docs/index.html`) typechecks, normalizes,
-and serializes (JSON/TOML/YAML) Dhall expressions in a textarea, and loads the
-`examples/*.dhall` files. `src/wasm.c` provides the browser-callable entry point
-and is deliberately kept out of the native cosmocc build (`Makefile` `SRC`).
+quirks). The built `docs/dhall.js` + `docs/dhall.wasm` are committed. A GitHub
+Actions workflow (`.github/workflows/pages.yml`) deploys `docs/` to GitHub Pages
+on every push to `master`; enable it once via Settings → Pages → Source →
+**GitHub Actions** (no branch config or extra toolchain needed in CI). The site
+(`docs/index.html`) typechecks, normalizes, and serializes (JSON/TOML/YAML)
+Dhall expressions in a textarea, and loads the `examples/*.dhall` files.
+`src/wasm.c` provides the browser-callable entry point and is deliberately kept
+out of the native cosmocc build (`Makefile` `SRC`).
 
 ## Language features
 
@@ -110,6 +112,9 @@ bidirectional typechecking) includes:
   `normalize` and serializer (`to-json`/`to-toml`/`to-yaml`) modes do not
   typecheck first, so `assert : False` there evaluates to `true` without an
   error (always typecheck first to rely on the guarantee).
+- **Serializers** — one evaluated value tree renders the same expression to
+  **JSON**, **TOML** (top level must be a record), or **YAML** (block style, 1.2
+  core schema), reusing a single shared value representation.
 - **Imports** — local file imports and `env:` imports (see below).
 
 ### Multiline strings and Unicode operators
