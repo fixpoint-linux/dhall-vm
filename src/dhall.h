@@ -82,7 +82,8 @@ struct BigNat {
 /* binary operator kinds (TmOp) */
 typedef enum {
     OP_ADD, OP_SUB, OP_MUL,
-    OP_LT, OP_LE, OP_GT, OP_GE, OP_EQ, OP_NE
+    OP_LT, OP_LE, OP_GT, OP_GE, OP_EQ, OP_NE,
+    OP_AND, OP_OR
 } OpKind;
 
 typedef enum {
@@ -111,7 +112,9 @@ typedef enum {
     TmAssert,       /* assert : body */
     TmToMap,        /* toMap r */
     TmCombine,      /* l /\ r  (recursive record merge) */
-    TmWith          /* r with a.b = v  (record update) */
+    TmWith,         /* r with a.b = v  (record update) */
+    TmListAppend,   /* a # b  (list append) */
+    TmPrefer        /* l // r  (right-biased record merge) */
 } TermTag;
 
 struct TextPart {
@@ -153,6 +156,8 @@ struct Term {
         struct { Term *rec; } tomap;          /* TmToMap */
         struct { Term *lhs, *rhs; } combine;  /* TmCombine */
         struct { Term *rec; char **path; int npath; Term *value; } with_; /* TmWith */
+        struct { Term *a, *b; } lappend;      /* TmListAppend */
+        struct { Term *lhs, *rhs; } prefer;   /* TmPrefer */
     } as;
 };
 
@@ -213,6 +218,8 @@ Term *tm_assert(Term *body);
 Term *tm_tomap(Term *rec);
 Term *tm_combine(Term *lhs, Term *rhs);
 Term *tm_with(Term *rec, char **path, int npath, Term *value);
+Term *tm_list_append(Term *a, Term *b);
+Term *tm_prefer(Term *lhs, Term *rhs);
 
 Field *field_new(const char *label, Term *type, Term *value);
 Term *text_parts_single(const char *lit);   /* text with one literal part */
@@ -246,6 +253,10 @@ typedef enum {
     T_IMPORT,   /* ./path, ../path, /path, env:NAME */
     T_BAR,      /* | */
     T_MERGE,    /* /\ */
+    T_PREFER,   /* // */
+    T_AND,      /* && */
+    T_OR,       /* || */
+    T_HASH,     /* # */
     T_ERROR
 } TokType;
 

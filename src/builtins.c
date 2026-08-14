@@ -83,6 +83,28 @@ static Term *direct_natural_fold(void) {
                   tm_pi(tm_var(1), tm_var(2)))));
 }
 
+/* List/head, List/last : forall T : Type -> List T -> Optional T */
+static Term *list_head_type(void) {
+    return tm_pi(tm_type(),
+              tm_pi(tm_app(builtin_list(), tm_var(0)),
+                tm_app(opt(), tm_var(1))));
+}
+
+/* List/indexed : forall T : Type -> List T -> List { index : Natural, value : T } */
+static Term *list_indexed_type(void) {
+    Field *fs = arena_alloc(dhall_arena, 2 * sizeof(Field));
+    fs[0].label = arena_strdup(dhall_arena, "index");
+    fs[0].type = builtin_nat();
+    fs[0].value = NULL;
+    fs[1].label = arena_strdup(dhall_arena, "value");
+    fs[1].type = tm_var(1);
+    fs[1].value = NULL;
+    Term *rec = tm_record_type(fs, 2);
+    return tm_pi(tm_type(),
+              tm_pi(tm_app(builtin_list(), tm_var(0)),
+                tm_app(builtin_list(), rec)));
+}
+
 /* type schema for a builtin when used as a term; NULL if not a known builtin */
 Term *builtin_type_schema(const char *n) {
     if (builtin_is_type_name(n)) return tm_type();
@@ -103,5 +125,13 @@ Term *builtin_type_schema(const char *n) {
     if (!strcmp(n, "Integer/toDouble"))  return tm_pi(builtin_int(), builtin_dbl());
     if (!strcmp(n, "Text/replace"))      return tm_pi(builtin_text(), tm_pi(builtin_text(), tm_pi(builtin_text(), builtin_text())));
     if (!strcmp(n, "List/length"))       return tm_pi(tm_type(), tm_pi(tm_app(builtin_list(), tm_var(0)), nat()));
+    if (!strcmp(n, "Integer/negate"))    return tm_pi(builtin_int(), builtin_int());
+    if (!strcmp(n, "Integer/show"))      return tm_pi(builtin_int(), builtin_text());
+    if (!strcmp(n, "Integer/clamp"))     return tm_pi(builtin_int(), nat());
+    if (!strcmp(n, "Double/show"))       return tm_pi(builtin_dbl(), builtin_text());
+    if (!strcmp(n, "Text/show"))         return tm_pi(builtin_text(), builtin_text());
+    if (!strcmp(n, "List/head"))         return list_head_type();
+    if (!strcmp(n, "List/last"))         return list_head_type();
+    if (!strcmp(n, "List/indexed"))      return list_indexed_type();
     return NULL;
 }

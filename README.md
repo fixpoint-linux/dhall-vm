@@ -96,17 +96,19 @@ bidirectional typechecking) includes:
 - **Binders** — `let`, lambdas (`\(x : T) -> body`), `forall`/Pi,
   annotations (`e : T`), `if/then/else`.
 - **Records** — record types `{ a : T }`, record literals `{ a = v }`,
-  field access, `toMap`, recursive record merge (`/\`), and `with` record
-  update.
-- **Lists** — `[a, b, c]`, `List/map`, `List/filter`, `List/reverse`,
-  `List/fold`, `List/length`.
+  field access, `toMap`, recursive record merge (`/\`), right-biased merge
+  (`//`), and `with` record update.
+- **Lists** — `[a, b, c]`, list append (`#`), `List/map`, `List/filter`,
+  `List/reverse`, `List/fold`, `List/length`, `List/head`, `List/last`,
+  `List/indexed`.
 - **Unions** — `< A : T | B : U >` and `< A = v | B : U >`, `merge`.
 - **Optionals** — `Optional T`, `Some x`, `None T`, `Optional/fold`.
-- **Arithmetic** — `+ - *` and comparisons `== != < <= > >=` over
-  `Natural`/`Integer`/`Double` (equality also over `Bool`/`Text`), plus
-  `Natural/isZero`, `Natural/show`, `Natural/subtract`, `Natural/fold`,
-  `Natural/even`, `Natural/odd`, `Natural/toInteger`, `Integer/toDouble`,
-  `Text/replace`.
+- **Arithmetic** — `+ - *`, boolean logic (`&&`, `||`), and comparisons
+  `== != < <= > >=` over `Natural`/`Integer`/`Double` (equality also over
+  `Bool`/`Text`), plus `Natural/isZero`, `Natural/show`, `Natural/subtract`,
+  `Natural/fold`, `Natural/even`, `Natural/odd`, `Natural/toInteger`,
+  `Integer/toDouble`, `Integer/negate`, `Integer/show`, `Integer/clamp`,
+  `Double/show`, `Text/show`, `Text/replace`.
 - **Assertions** — `assert : body` where `body : Bool` and normalizes to
   `True`. Note: the assertion is enforced during `typecheck`; the
   `normalize` and serializer (`to-json`/`to-toml`/`to-yaml`) modes do not
@@ -142,16 +144,23 @@ bidirectional typechecking) includes:
   `Integer` remains 64-bit: `+ - *` overflow via built-in checked
   arithmetic. `Double` is IEEE 754 (JSON maps non-finite to `null`).
 - Division is intentionally **not** supported (no `/` operator).
-- Operator precedence (loosest to tightest): `->`, `:`, `with`, comparisons,
-  `+ - ++`, `/\`, `*`, application.
+- Operator precedence (loosest to tightest): `->`, `:`, `with`, `||`, `&&`,
+  comparisons, `+ - ++ #`, `/\`, `//`, `*`, application.
 - `/\` is a **recursive** record merge: disjoint fields are kept, shared
   fields are recursively merged. A shared field that is not a record on both
-  sides is a *type error* (faithful Dhall); the right-biased override is the
-  separate `//` operator, which is not supported.
+  sides is a *type error* (faithful Dhall). `//` is the **right-biased**
+  (non-recursive) merge/prefer: disjoint fields are kept and a shared field
+  takes the right-hand value, with no recursion and no error on shared
+  non-record fields.
 - `with` both updates (a field's type may change) and inserts fields, and
   creates intermediate records for nested paths (`e with a.b = v`).
 - `Natural/subtract a b` is `max (b - a) 0` — the argument order is the
   opposite of the `-` operator.
+- `&&`/`||` require both operands to be `Bool`. `Integer/show` prints a
+  leading `+` for non-negative values (`Integer/show +3` = `"+3"`), and
+  `Text/show` renders a `Text` as a double-quoted Dhall literal with `$`
+  escaped as `\u0024`. `Integer/clamp` maps a negative `Integer` to `0`;
+  `Integer/negate` errors on `-9223372036854775808` (overflow).
 - `Natural/fold` is capped at `2^20` iterations (DoS guard).
 
 ### Optionals

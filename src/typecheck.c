@@ -115,6 +115,13 @@ static Term *infer_binop(Ctx *g, Term *t, DhallError *err) {
     }
     int k = scalar_kind(nl);
     OpKind op = t->as.op.op;
+    if (op == OP_AND || op == OP_OR) {
+        if (k != SC_BOOL) {
+            err_here(err, ERR_TYPE, t, "logical operator requires Bool operands");
+            return NULL;
+        }
+        return tm_builtin("Bool");
+    }
     if (op == OP_ADD || op == OP_SUB || op == OP_MUL) {
         if (k != SC_NAT && k != SC_INT && k != SC_DBL) {
             err_here(err, ERR_TYPE, t, "arithmetic operator requires Natural/Integer/Double operands");
@@ -166,6 +173,25 @@ static Term *merge_record_types(Term *l, Term *r, Term *loc, DhallError *err) {
             }
             n++; i++; j++;
         }
+    }
+    return tm_record_type(out, n);
+}
+
+/* right-biased (non-recursive) merge of two record TYPES for the // operator:
+   a shared label takes the right-hand type, with no recursion and no error. */
+static Term *prefer_record_types(Term *l, Term *r) {
+    Field *lfs = l->as.rec.fs; int ln = l->as.rec.n;
+    Field *rfs = r->as.rec.fs; int rn = r->as.rec.n;
+    Field *out = arena_alloc(dhall_arena, (size_t)(ln + rn) * sizeof(Field));
+    int n = 0, i = 0, j = 0;
+    while (i < ln || j < rn) {
+        int cmp;
+        if (i >= ln) cmp = 1;
+        else if (j >= rn) cmp = -1;
+        else cmp = strcmp(lfs[i].label, rfs[j].label);
+        if (cmp < 0) { out[n++] = lfs[i++]; }
+        else if (cmp > 0) { out[n++] = rfs[j++]; }
+        else { out[n++] = rfs[j++]; i++; }
     }
     return tm_record_type(out, n);
 }
@@ -499,6 +525,43 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
             return NULL;
         }
         return merge_record_types(nlt, nrt, t, err);
+    }
+    case TmListAppend: {
+        Term *aty = infer(g, t->as.lappend.a, err);
+        if (!aty) return NULL;
+        Term *bty = infer(g, t->as.lappend.b, err);
+        if (!bty) return NULL;
+        Term *nat = normalize(aty);
+        Term *nbt = normalize(bty);
+        if (!is_list_type(nat) || !is_list_type(nbt)) {
+            err_here(err, ERR_TYPE, t, "list append operand is not a List");
+            return NULL;
+        }
+        if (!alpha_eq(normalize(nat->as.app.arg), normalize(nbt->as.app.arg))) {
+            err_here(err, ERR_TYPE, t, "list append operands have different element types");
+            return NULL;
+        }
+        return nat;
+    }
+    case TmPrefer: {
+        Term *nl = normalize(t->as.prefer.lhs);
+        Term *nr = normalize(t->as.prefer.rhs);
+        if (nl->tag == TmRecordType && nr->tag == TmRecordType) {
+            /* type-level prefer: both operands are record types */
+            prefer_record_types(nl, nr); /* never errors; result discarded */
+            return tm_type();
+        }
+        Term *lty = infer(g, t->as.prefer.lhs, err);
+        if (!lty) return NULL;
+        Term *rty = infer(g, t->as.prefer.rhs, err);
+        if (!rty) return NULL;
+        Term *nlt = normalize(lty);
+        Term *nrt = normalize(rty);
+        if (nlt->tag != TmRecordType || nrt->tag != TmRecordType) {
+            err_here(err, ERR_TYPE, t, "record prefer operand is not a record");
+            return NULL;
+        }
+        return prefer_record_types(nlt, nrt);
     }
     case TmWith: {
         Term *rty = infer(g, t->as.with_.rec, err);

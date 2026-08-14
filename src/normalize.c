@@ -206,6 +206,14 @@ static Term *norm_op(Term *t) {
     OpKind op = t->as.op.op;
     SourceSpan loc = t->loc;
 
+    /* boolean logic: eager AND/OR over Bool constants (no short-circuit) */
+    if (op == OP_AND || op == OP_OR) {
+        if (l->tag == TmConst && r->tag == TmConst &&
+            l->as.c.kind == C_BOOL && r->as.c.kind == C_BOOL)
+            return tm_bool(op == OP_AND ? (l->as.c.b && r->as.c.b) : (l->as.c.b || r->as.c.b));
+        return tm_op(op, l, r); /* stuck */
+    }
+
     if (l->tag == TmConst && r->tag == TmConst && l->as.c.kind == r->as.c.kind) {
         ConstKind k = l->as.c.kind;
         if (op == OP_ADD || op == OP_SUB || op == OP_MUL) {
@@ -406,6 +414,94 @@ static Term *norm_with(Term *t) {
     return with_update_lit(r, t->as.with_.path, t->as.with_.npath, v);
 }
 
+/* ---- list append # ---- */
+
+static Term *norm_list_append(Term *a, Term *b) {
+    Term *a2 = normalize(a);
+    Term *b2 = normalize(b);
+    if (a2->tag == TmNil) return b2;
+    if (a2->tag == TmCons) return tm_cons(a2->as.cons.head, norm_list_append(a2->as.cons.tail, b2));
+    return tm_list_append(a2, b2); /* stuck */
+}
+
+/* ---- record prefer // (right-biased, non-recursive) ---- */
+
+static Term *prefer_merge_lits(Term *l, Term *r) {
+    Field *lfs = l->as.rec.fs; int ln = l->as.rec.n;
+    Field *rfs = r->as.rec.fs; int rn = r->as.rec.n;
+    Field *out = arena_alloc(dhall_arena, (size_t)(ln + rn) * sizeof(Field));
+    int n = 0, i = 0, j = 0;
+    while (i < ln || j < rn) {
+        int cmp;
+        if (i >= ln) cmp = 1;
+        else if (j >= rn) cmp = -1;
+        else cmp = strcmp(lfs[i].label, rfs[j].label);
+        if (cmp < 0) { out[n++] = lfs[i++]; }
+        else if (cmp > 0) { out[n++] = rfs[j++]; }
+        else { out[n++] = rfs[j++]; i++; } /* shared label: right wins */
+    }
+    return tm_record_lit(out, n);
+}
+
+static Term *prefer_merge_types(Term *l, Term *r) {
+    Field *lfs = l->as.rec.fs; int ln = l->as.rec.n;
+    Field *rfs = r->as.rec.fs; int rn = r->as.rec.n;
+    Field *out = arena_alloc(dhall_arena, (size_t)(ln + rn) * sizeof(Field));
+    int n = 0, i = 0, j = 0;
+    while (i < ln || j < rn) {
+        int cmp;
+        if (i >= ln) cmp = 1;
+        else if (j >= rn) cmp = -1;
+        else cmp = strcmp(lfs[i].label, rfs[j].label);
+        if (cmp < 0) { out[n++] = lfs[i++]; }
+        else if (cmp > 0) { out[n++] = rfs[j++]; }
+        else { out[n++] = rfs[j++]; i++; } /* shared label: right wins */
+    }
+    return tm_record_type(out, n);
+}
+
+static Term *norm_prefer(Term *l, Term *r) {
+    Term *l2 = normalize(l);
+    Term *r2 = normalize(r);
+    if (l2->tag == TmRecordLit && r2->tag == TmRecordLit) return prefer_merge_lits(l2, r2);
+    if (l2->tag == TmRecordType && r2->tag == TmRecordType) return prefer_merge_types(l2, r2);
+    return tm_prefer(l2, r2); /* stuck */
+}
+
+/* ---- Double/show / Text/show renderers ---- */
+
+static Term *dbl_show(double d) {
+    char dbuf[64];
+    snprintf(dbuf, sizeof(dbuf), "%g", d);
+    if (!strchr(dbuf, '.') && !strchr(dbuf, 'e') && !strchr(dbuf, 'E') &&
+        !strchr(dbuf, 'n') && !strchr(dbuf, 'i'))
+        snprintf(dbuf + strlen(dbuf), sizeof(dbuf) - strlen(dbuf), ".0");
+    return tm_text_lit(dbuf);
+}
+
+static Term *text_show(Term *t) {
+    const char *s = t->as.text->lit;
+    TmpBuf b; tmpbuf_init(&b);
+    tmpbuf_addc(&b, '"');
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        switch (*p) {
+        case '"':  tmpbuf_add(&b, "\\\""); break;
+        case '\\': tmpbuf_add(&b, "\\\\"); break;
+        case '$':  tmpbuf_add(&b, "\\u0024"); break;
+        case '\b': tmpbuf_add(&b, "\\b"); break;
+        case '\f': tmpbuf_add(&b, "\\f"); break;
+        case '\n': tmpbuf_add(&b, "\\n"); break;
+        case '\r': tmpbuf_add(&b, "\\r"); break;
+        case '\t': tmpbuf_add(&b, "\\t"); break;
+        default:
+            if (*p < 0x20) { char esc[8]; snprintf(esc, sizeof(esc), "\\u%04x", *p); tmpbuf_add(&b, esc); }
+            else tmpbuf_addc(&b, (char)*p);
+        }
+    }
+    tmpbuf_addc(&b, '"');
+    return tm_text_lit(tmpbuf_arena(dhall_arena, &b));
+}
+
 Term *normalize(Term *t) {
     switch (t->tag) {
     case TmVar: case TmConst: case TmType: case TmKind: case TmSort:
@@ -591,6 +687,79 @@ Term *normalize(Term *t) {
             /* stuck list (bound var / stuck tail): fall through and leave
                the application stuck, mirroring List/map/List/reverse */
         }
+        if (match_builtin("Integer/negate", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_INT) {
+                int64_t res;
+                if (__builtin_sub_overflow((int64_t)0, n->as.c.i64, &res)) {
+                    norm_set_error(t->loc, "Integer/negate overflow");
+                    return t; /* stuck */
+                }
+                return tm_int(res);
+            }
+        }
+        if (match_builtin("Integer/show", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_INT) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%s%lld", n->as.c.i64 >= 0 ? "+" : "",
+                         (long long)n->as.c.i64);
+                return tm_text_lit(buf);
+            }
+        }
+        if (match_builtin("Integer/clamp", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_INT)
+                return tm_nat(n->as.c.i64 < 0 ? 0 : (uint64_t)n->as.c.i64);
+        }
+        if (match_builtin("Double/show", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmConst && n->as.c.kind == C_DBL)
+                return dbl_show(n->as.c.dbl);
+        }
+        if (match_builtin("Text/show", 1, t, args)) {
+            Term *n = normalize(args[0]);
+            if (n->tag == TmText && !text_has_interp(n))
+                return text_show(n);
+        }
+        if (match_builtin("List/head", 2, t, args)) {
+            Term *xs = normalize(args[1]);
+            if (xs->tag == TmCons) return tm_some(xs->as.cons.head);
+            if (xs->tag == TmNil) return tm_none(normalize(args[0]));
+        }
+        if (match_builtin("List/last", 2, t, args)) {
+            Term *xs = normalize(args[1]);
+            if (xs->tag == TmNil) return tm_none(normalize(args[0]));
+            if (xs->tag == TmCons) {
+                Term *cur = xs;
+                while (cur->as.cons.tail->tag == TmCons) cur = cur->as.cons.tail;
+                if (cur->as.cons.tail->tag != TmNil) return t; /* stuck tail */
+                return tm_some(cur->as.cons.head);
+            }
+        }
+        if (match_builtin("List/indexed", 2, t, args)) {
+            Term *xs = normalize(args[1]);
+            if (xs->tag == TmNil) return tm_nil();
+            if (xs->tag == TmCons) {
+                Term *rev = tm_nil();
+                uint64_t i = 0;
+                Term *cur = xs;
+                while (cur->tag == TmCons) {
+                    Field *fs = arena_alloc(dhall_arena, 2 * sizeof(Field));
+                    fs[0].label = arena_strdup(dhall_arena, "index");
+                    fs[0].type = NULL;
+                    fs[0].value = tm_nat(i);
+                    fs[1].label = arena_strdup(dhall_arena, "value");
+                    fs[1].type = NULL;
+                    fs[1].value = cur->as.cons.head;
+                    rev = tm_cons(tm_record_lit(fs, 2), rev);
+                    i++;
+                    cur = cur->as.cons.tail;
+                }
+                if (cur->tag != TmNil) return t; /* stuck tail */
+                return reverse_list(rev);
+            }
+        }
         Term *f = normalize(t->as.app.fn);
         if (f->tag == TmLam) return normalize(subst(0, t->as.app.arg, f->as.lam.body));
         return tm_app(f, normalize(t->as.app.arg));
@@ -648,6 +817,8 @@ Term *normalize(Term *t) {
     case TmToMap: return norm_tomap(t);
     case TmCombine: return norm_combine(t->as.combine.lhs, t->as.combine.rhs);
     case TmWith: return norm_with(t);
+    case TmListAppend: return norm_list_append(t->as.lappend.a, t->as.lappend.b);
+    case TmPrefer: return norm_prefer(t->as.prefer.lhs, t->as.prefer.rhs);
     }
     return t;
 }

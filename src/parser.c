@@ -4,8 +4,8 @@
    interpolation via raw-char reading with recursive expression parsing.
 
    Precedence (loosest→tightest):
-     ->  <  :  <  with  <  comparison(== != < <= > >=)  <  additive(+ - ++)
-        <  /\  <  multiplicative(*)  <  application
+     ->  <  :  <  with  <  ||  <  &&  <  comparison(== != < <= > >=)
+        <  additive(+ - ++ #)  <  /\  <  //  <  multiplicative(*)  <  application
    Every constructed term's .loc is stamped (tloc) from the current token
    so type errors report file:line:col. Imports are inlined at parse time
    (no TmImport tag survives; the loader lives in Parser.loader). */
@@ -80,9 +80,12 @@ static Term *parse_if(Parser *p);
 static Term *parse_assert(Parser *p);
 static Term *parse_arrow(Parser *p);
 static Term *parse_annotation(Parser *p);
+static Term *parse_or(Parser *p);
+static Term *parse_and(Parser *p);
 static Term *parse_comparison(Parser *p);
 static Term *parse_additive(Parser *p);
 static Term *parse_combine(Parser *p);
+static Term *parse_prefer(Parser *p);
 static Term *parse_multiplicative(Parser *p);
 static Term *parse_merge(Parser *p);
 static Term *parse_with(Parser *p);
@@ -254,6 +257,35 @@ static Term *parse_annotation(Parser *p) {
     return e;
 }
 
+/* boolean OR / AND — LOOSER than comparisons, TIGHTER than `with`.
+   Inside a union alternative (union_depth > 0) neither is active, so a `||`
+   or `&&` there is left to the union grammar rather than mis-lexed. */
+static Term *parse_or(Parser *p) {
+    if (p->union_depth > 0) return parse_additive(p);
+    Term *left = parse_and(p);
+    if (!left) return NULL;
+    while (at(p, T_OR)) {
+        Token op_tk = next(p);
+        Term *r = parse_and(p);
+        if (!r) return NULL;
+        left = tloc(tm_op(OP_OR, left, r), op_tk.span);
+    }
+    return left;
+}
+
+static Term *parse_and(Parser *p) {
+    if (p->union_depth > 0) return parse_additive(p);
+    Term *left = parse_comparison(p);
+    if (!left) return NULL;
+    while (at(p, T_AND)) {
+        Token op_tk = next(p);
+        Term *r = parse_comparison(p);
+        if (!r) return NULL;
+        left = tloc(tm_op(OP_AND, left, r), op_tk.span);
+    }
+    return left;
+}
+
 static Term *parse_comparison(Parser *p) {
     if (p->union_depth > 0) return parse_additive(p); /* no comparison in union alts */
     Term *left = parse_additive(p);
@@ -296,20 +328,38 @@ static Term *parse_additive(Parser *p) {
             Term *r = parse_combine(p);
             if (!r) return NULL;
             left = tloc(tm_append(left, r), op_tk.span);
+        } else if (op_tk.type == T_HASH) {
+            next(p);
+            Term *r = parse_combine(p);
+            if (!r) return NULL;
+            left = tloc(tm_list_append(left, r), op_tk.span);
         } else break;
     }
     return left;
 }
 
-/* record merge /\ — TIGHTER than + - ++, LOOSER than *; left-associative */
+/* record merge /\ — TIGHTER than + - ++ #, LOOSER than //; left-associative */
 static Term *parse_combine(Parser *p) {
-    Term *left = parse_multiplicative(p);
+    Term *left = parse_prefer(p);
     if (!left) return NULL;
     while (at(p, T_MERGE)) {
         Token op_tk = next(p);
-        Term *r = parse_multiplicative(p);
+        Term *r = parse_prefer(p);
         if (!r) return NULL;
         left = tloc(tm_combine(left, r), op_tk.span);
+    }
+    return left;
+}
+
+/* record prefer // — TIGHTER than /\, LOOSER than *; left-associative */
+static Term *parse_prefer(Parser *p) {
+    Term *left = parse_multiplicative(p);
+    if (!left) return NULL;
+    while (at(p, T_PREFER)) {
+        Token op_tk = next(p);
+        Term *r = parse_multiplicative(p);
+        if (!r) return NULL;
+        left = tloc(tm_prefer(left, r), op_tk.span);
     }
     return left;
 }
@@ -342,7 +392,7 @@ static Term *parse_merge(Parser *p) {
    :/->, so `e with a = v : T` annotates the WHOLE with; the while-loop chains
    greedily, so `e with a = x with b = 1` = `(e with a = x) with b = 1`). */
 static Term *parse_with(Parser *p) {
-    Term *e = parse_comparison(p);
+    Term *e = parse_or(p);
     if (!e) return NULL;
     while (at_name(p, "with")) {
         Token wt = next(p); /* with */
@@ -369,7 +419,7 @@ static Term *parse_with(Parser *p) {
             labels[n++] = lt.name;
         }
         if (!expect(p, T_EQUALS, "'=' in with expression")) { free(labels); return NULL; }
-        Term *v = parse_comparison(p);
+        Term *v = parse_or(p);
         if (!v) { free(labels); return NULL; }
         char **path = arena_alloc(dhall_arena, (size_t)n * sizeof(char *));
         for (int i = 0; i < n; i++) path[i] = arena_strdup(dhall_arena, labels[i]);

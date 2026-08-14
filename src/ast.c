@@ -77,6 +77,8 @@ Term *tm_op(OpKind op, Term *l, Term *r) { Term *t = mk(TmOp, SPAN_NONE); t->as.
 Term *tm_assert(Term *b)  { Term *t = mk(TmAssert, SPAN_NONE); t->as.assert_.body = b; return t; }
 Term *tm_tomap(Term *r)   { Term *t = mk(TmToMap, SPAN_NONE); t->as.tomap.rec = r; return t; }
 Term *tm_combine(Term *l, Term *r) { Term *t = mk(TmCombine, SPAN_NONE); t->as.combine.lhs = l; t->as.combine.rhs = r; return t; }
+Term *tm_list_append(Term *a, Term *b) { Term *t = mk(TmListAppend, SPAN_NONE); t->as.lappend.a = a; t->as.lappend.b = b; return t; }
+Term *tm_prefer(Term *l, Term *r) { Term *t = mk(TmPrefer, SPAN_NONE); t->as.prefer.lhs = l; t->as.prefer.rhs = r; return t; }
 Term *tm_with(Term *rec, char **path, int npath, Term *value) {
     Term *t = mk(TmWith, SPAN_NONE);
     t->as.with_.rec = rec;
@@ -163,6 +165,8 @@ Term *shift(int d, int cutoff, Term *t) {
     case TmAssert: return tm_assert(shift(d, cutoff, t->as.assert_.body));
     case TmToMap:  return tm_tomap(shift(d, cutoff, t->as.tomap.rec));
     case TmCombine: return tm_combine(shift(d, cutoff, t->as.combine.lhs), shift(d, cutoff, t->as.combine.rhs));
+    case TmListAppend: return tm_list_append(shift(d, cutoff, t->as.lappend.a), shift(d, cutoff, t->as.lappend.b));
+    case TmPrefer: return tm_prefer(shift(d, cutoff, t->as.prefer.lhs), shift(d, cutoff, t->as.prefer.rhs));
     case TmWith:    return tm_with(shift(d, cutoff, t->as.with_.rec), t->as.with_.path,
                                    t->as.with_.npath, shift(d, cutoff, t->as.with_.value));
     case TmConst: case TmType: case TmKind: case TmSort:
@@ -232,6 +236,8 @@ Term *subst(int j, Term *s, Term *t) {
     case TmAssert: return tm_assert(subst(j, s, t->as.assert_.body));
     case TmToMap:  return tm_tomap(subst(j, s, t->as.tomap.rec));
     case TmCombine: return tm_combine(subst(j, s, t->as.combine.lhs), subst(j, s, t->as.combine.rhs));
+    case TmListAppend: return tm_list_append(subst(j, s, t->as.lappend.a), subst(j, s, t->as.lappend.b));
+    case TmPrefer: return tm_prefer(subst(j, s, t->as.prefer.lhs), subst(j, s, t->as.prefer.rhs));
     case TmWith:    return tm_with(subst(j, s, t->as.with_.rec), t->as.with_.path,
                                    t->as.with_.npath, subst(j, s, t->as.with_.value));
     case TmConst: case TmType: case TmKind: case TmSort:
@@ -311,6 +317,8 @@ bool alpha_eq(Term *a, Term *b) {
     case TmAssert: return alpha_eq(a->as.assert_.body, b->as.assert_.body);
     case TmToMap:  return alpha_eq(a->as.tomap.rec, b->as.tomap.rec);
     case TmCombine: return alpha_eq(a->as.combine.lhs, b->as.combine.lhs) && alpha_eq(a->as.combine.rhs, b->as.combine.rhs);
+    case TmListAppend: return alpha_eq(a->as.lappend.a, b->as.lappend.a) && alpha_eq(a->as.lappend.b, b->as.lappend.b);
+    case TmPrefer: return alpha_eq(a->as.prefer.lhs, b->as.prefer.lhs) && alpha_eq(a->as.prefer.rhs, b->as.prefer.rhs);
     case TmWith: {
         if (a->as.with_.npath != b->as.with_.npath) return false;
         for (int i = 0; i < a->as.with_.npath; i++)
@@ -348,6 +356,8 @@ static const char *op_str(OpKind op) {
     case OP_GE: return ">=";
     case OP_EQ: return "==";
     case OP_NE: return "!=";
+    case OP_AND: return "&&";
+    case OP_OR: return "||";
     }
     return "?";
 }
@@ -478,6 +488,10 @@ void print_term(FILE *out, Term *t) {
     case TmToMap:  { fputs("(toMap ", out); print_term(out, t->as.tomap.rec); fputc(')', out); break; }
     case TmCombine: { fputc('(', out); print_term(out, t->as.combine.lhs); fputs(" /\\ ", out);
                       print_term(out, t->as.combine.rhs); fputc(')', out); break; }
+    case TmListAppend: { fputc('(', out); print_term(out, t->as.lappend.a); fputs(" # ", out);
+                         print_term(out, t->as.lappend.b); fputc(')', out); break; }
+    case TmPrefer: { fputc('(', out); print_term(out, t->as.prefer.lhs); fputs(" // ", out);
+                     print_term(out, t->as.prefer.rhs); fputc(')', out); break; }
     case TmWith: { fputc('(', out); print_term(out, t->as.with_.rec); fputs(" with ", out);
                    for (int i = 0; i < t->as.with_.npath; i++) {
                        if (i) fputc('.', out);

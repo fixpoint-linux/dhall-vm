@@ -280,6 +280,13 @@ static Token tokenize(Lexer *lx) {
         return emit(lx, T_MERGE, sp, NULL);
     }
 
+    /* record prefer operator // — likewise BEFORE the import-path branch. */
+    if (c == '/' && lx->pos + 1 < lx->len && lx->src[lx->pos + 1] == '/') {
+        lexer_read_char(lx);
+        lexer_read_char(lx);
+        return emit(lx, T_PREFER, sp, NULL);
+    }
+
     /* import path: ./ ../ /abs */
     if (c == '/' ||
         (c == '.' && lx->pos + 1 < lx->len && lx->src[lx->pos + 1] == '/') ||
@@ -346,7 +353,15 @@ static Token tokenize(Lexer *lx) {
         return emit(lx, T_RANGLE, sp, NULL);
     case '[': return emit(lx, T_LBRACKET, sp, NULL);
     case ']': return emit(lx, T_RBRACKET, sp, NULL);
-    case '|': return emit(lx, T_BAR, sp, NULL);
+    case '|':
+        if (cur(lx) == '|') { lexer_read_char(lx); return emit(lx, T_OR, sp, NULL); }
+        return emit(lx, T_BAR, sp, NULL);
+    case '&':
+        if (cur(lx) == '&') { lexer_read_char(lx); return emit(lx, T_AND, sp, NULL); }
+        lx->err.stage = ERR_LEX; lx->err.span = sp; lx->err.has_span = true;
+        snprintf(lx->err.msg, sizeof(lx->err.msg), "unexpected '&'");
+        return emit(lx, T_ERROR, sp, NULL);
+    case '#': return emit(lx, T_HASH, sp, NULL);
     case '*': return emit(lx, T_STAR, sp, NULL);
     case '+':
         if (cur(lx) == '+') { lexer_read_char(lx); return emit(lx, T_PLUSPLUS, sp, NULL); }
