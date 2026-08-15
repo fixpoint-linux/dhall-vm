@@ -70,6 +70,8 @@ check_one lambda-under-ann '\(x : Natural) -> \(y : Natural) -> y'
 check_one stuck-interp       '\(x : Text) -> "${x}"'
 check_one stuck-interp-mixed '\(x : Text) -> "a${x}b"'
 check_one stuck-interp-multi '\(x : Text) -> \(y : Text) -> "a${x}b${y}c"'
+check_one dbl-rt-lossy 'Double/show 0.123456789'
+check_one dbl-rt-sum    '0.1 + 0.2'
 
 echo
 echo "=== $pass passed, $fail failed ==="

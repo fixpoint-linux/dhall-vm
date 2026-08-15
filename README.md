@@ -144,7 +144,9 @@ bidirectional typechecking) includes:
   Comparisons (`< <= > >=`) accept `Natural`/`Integer`/`Double`.
 - `Natural` and `Integer` are **unbounded** (arbitrary precision); `+` `-` `*`
   never overflow. `Natural` subtraction **saturates** at `0` (`2 - 7 == 0`).
-  `Double` is IEEE 754 (JSON maps non-finite to `null`).
+  `Double` is IEEE 754 (JSON maps non-finite to `null`). Double literals are
+  printed with the **shortest round-trip** representation (and non-finite maps
+  to `null`/`.nan`/`.inf`/`-.inf`/`nan`/`inf` per format).
 - Division is intentionally **not** supported (no `/` operator).
 - Operator precedence (loosest to tightest): `->`, `:`, `with`, `||`, `&&`,
   comparisons, `+ - ++ #`, `/\`, `//`, `*`, application.

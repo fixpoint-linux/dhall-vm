@@ -2,6 +2,7 @@
    alpha-equivalence, and a normal-form pretty-printer.
    Adopts the verified de Bruijn core from ref/proto.c. */
 #include "dhall.h"
+#include <math.h>
 
 Arena *dhall_arena = NULL;
 
@@ -403,6 +404,25 @@ static void print_list(FILE *out, Term *t) {
     fputc(']', out);
 }
 
+/* shortest-round-trip Double literal: the fewest significant digits that
+   strtod-parse back to the same double, always a valid Dhall Double literal
+   (numeric-double-literal = 1*DIGIT ( '.' 1*DIGIT [exponent] / exponent ),
+   exponent = "e" ["+"/"-"] 1*DIGIT). Non-finite keeps the legacy lowercase
+   nan/inf/-inf (a documented deviation from NaN/Infinity/-Infinity). */
+void dbl_fmt(char *buf, size_t cap, double d) {
+    if (isnan(d))       { snprintf(buf, cap, "nan");  return; }
+    if (d == INFINITY)  { snprintf(buf, cap, "inf");  return; }
+    if (d == -INFINITY) { snprintf(buf, cap, "-inf"); return; }
+    for (int p = 0; p <= 17; p++) {
+        snprintf(buf, cap, "%.*g", p, d);
+        if (strtod(buf, NULL) == d) break; /* first precision that round-trips */
+    }
+    if (!strchr(buf, '.') && !strchr(buf, 'e') && !strchr(buf, 'E')) {
+        size_t n = strlen(buf);
+        snprintf(buf + n, cap - n, ".0");  /* bare integer -> "N.0" */
+    }
+}
+
 void print_term(FILE *out, Term *t);
 
 static void print_lam_body(FILE *out, Term *dom, Term *body) {
@@ -431,14 +451,8 @@ void print_term(FILE *out, Term *t) {
         }
         case C_DBL: {
             char dbuf[64];
-            snprintf(dbuf, sizeof(dbuf), "%g", t->as.c.dbl);
+            dbl_fmt(dbuf, sizeof(dbuf), t->as.c.dbl);
             fputs(dbuf, out);
-            /* %g drops the decimal point for whole numbers; a Dhall Double
-               literal must contain '.' or an exponent, so re-add ".0".
-               (inf/nan are already a documented deviation — leave as-is.) */
-            if (!strchr(dbuf, '.') && !strchr(dbuf, 'e') && !strchr(dbuf, 'E') &&
-                !strchr(dbuf, 'n') && !strchr(dbuf, 'i'))
-                fputs(".0", out);
             break;
         }
         case C_BOOL: fputs(t->as.c.b ? "True" : "False", out); break;

@@ -28,19 +28,13 @@ collapses to `"say hi"`.
 
 ## 2. Double/show (and the serializers) print with `%g`, not shortest-round-trip
 
-**Status:** OPEN (accepted deviation).
+**Status:** FIXED.
 
-`Double/show` (`src/normalize.c` `dbl_show`) formats a `Double` literal with
-`%g`, which yields only 6 significant digits. For common inputs this is **lossy**
-or malformed:
-- `Double/show 0.123456789` → `"0.123457"` (should round-trip to
-  `"0.123456789"`).
-- `Double/show 1e10` → `"1e+10"` (not a valid Dhall Double literal; the `.0` /
-  scientific marker is wrong).
-
-This is consistent with the pre-existing value serializers (`serialize.c` also
-uses `%g`), so it is a codebase-wide Double-literal-formatting limitation, not a
-regression from the `Double/show` builtin. Real Dhall requires the **shortest
-round-trip** literal (Grisu/Ryu). Fixing it properly means a shortest-round-trip
-formatter shared by `print_term`, `Double/show`, and the JSON/TOML/YAML
-serializers.
+`Double/show`, `print_term`, and the JSON/TOML/YAML serializers now emit the
+**shortest round-trip** literal via the shared `dbl_fmt` helper in `src/ast.c`
+(fewest significant digits that `strtod`-parse back to the same `Double`; a
+`.0` marker is appended when the result would otherwise be a bare integer).
+Examples: `Double/show 0.123456789` → `"0.123456789"`,
+`Double/show (0.1 + 0.2)` → `"0.30000000000000004"`. The legacy lowercase
+`nan`/`inf`/`-inf` handling is preserved (a documented deviation from
+`NaN`/`Infinity`/`-Infinity`).

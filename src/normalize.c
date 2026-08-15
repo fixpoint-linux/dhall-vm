@@ -474,10 +474,7 @@ static Term *norm_prefer(Term *l, Term *r) {
 
 static Term *dbl_show(double d) {
     char dbuf[64];
-    snprintf(dbuf, sizeof(dbuf), "%g", d);
-    if (!strchr(dbuf, '.') && !strchr(dbuf, 'e') && !strchr(dbuf, 'E') &&
-        !strchr(dbuf, 'n') && !strchr(dbuf, 'i'))
-        snprintf(dbuf + strlen(dbuf), sizeof(dbuf) - strlen(dbuf), ".0");
+    dbl_fmt(dbuf, sizeof(dbuf), d);
     return tm_text_lit(dbuf);
 }
 

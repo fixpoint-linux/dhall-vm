@@ -142,15 +142,9 @@ static void qstr(FILE *out, const char *s) {
     fputc('"', out);
 }
 
-/* finite float with a forced '.', 'e', or 'E' so TOML/YAML read it as float */
-static void dbl_marker(FILE *out, double d) {
-    char buf[64]; snprintf(buf, sizeof buf, "%g", d);
-    fputs(buf, out);
-    if (!strpbrk(buf, ".eE")) fputs(".0", out);
-}
-static void dbl_json(FILE *out, double d) { if (!isfinite(d)) fputs("null", out); else { char b[64]; snprintf(b, sizeof b, "%g", d); fputs(b, out); } }
-static void dbl_yaml(FILE *out, double d) { if (isnan(d)) fputs(".nan", out); else if (d == INFINITY) fputs(".inf", out); else if (d == -INFINITY) fputs("-.inf", out); else dbl_marker(out, d); }
-static void dbl_toml(FILE *out, double d) { if (isnan(d)) fputs("nan", out); else if (d == INFINITY) fputs("inf", out); else if (d == -INFINITY) fputs("-inf", out); else dbl_marker(out, d); }
+static void dbl_json(FILE *out, double d) { if (!isfinite(d)) fputs("null", out); else { char b[64]; dbl_fmt(b, sizeof b, d); fputs(b, out); } }
+static void dbl_yaml(FILE *out, double d) { if (isnan(d)) fputs(".nan", out); else if (d == INFINITY) fputs(".inf", out); else if (d == -INFINITY) fputs("-.inf", out); else { char b[64]; dbl_fmt(b, sizeof b, d); fputs(b, out); } }
+static void dbl_toml(FILE *out, double d) { if (isnan(d)) fputs("nan", out); else if (d == INFINITY) fputs("inf", out); else if (d == -INFINITY) fputs("-inf", out); else { char b[64]; dbl_fmt(b, sizeof b, d); fputs(b, out); } }
 
 /* TOML key: bare iff [A-Za-z0-9_-]+ and not a reserved word, else basic-quoted */
 static void toml_key(FILE *out, const char *k) {

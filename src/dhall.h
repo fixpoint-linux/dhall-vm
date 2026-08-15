@@ -242,6 +242,11 @@ bool alpha_eq(Term *a, Term *b);
 
 void print_term(FILE *out, Term *t);        /* pretty-print normal form */
 
+/* shortest-round-trip Double literal formatter (ast.c). Writes a valid Dhall
+   Double literal (always has a '.' or exponent) for finite d; non-finite d
+   keeps the legacy lowercase nan/inf/-inf deviation. */
+void dbl_fmt(char *buf, size_t cap, double d);
+
 /* builtins.c — well-known builtins and their type schemas */
 bool builtin_is_type_name(const char *n);
 bool builtin_is_list(const char *n);
