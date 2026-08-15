@@ -18,6 +18,7 @@
   var outputEl = document.getElementById('output');
   var statusEl = document.getElementById('status');
   var runBtn = document.getElementById('runBtn');
+  var copyBtn = document.getElementById('copyBtn');
   var modeBtns = Array.prototype.slice.call(document.querySelectorAll('#modes .mode'));
 
   var DEFAULT_SRC =
@@ -141,6 +142,34 @@
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doRun(); }
   });
+
+  // Copy the current result to the clipboard (with a legacy fallback).
+  if (copyBtn) {
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    copyBtn.addEventListener('click', function () {
+      var text = outputEl.value;
+      function done() {
+        copyBtn.textContent = 'Copied ✓';
+        setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1200);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      } else {
+        fallbackCopy(text);
+        done();
+      }
+    });
+  }
 
   // Boot the module, then run the default snippet.
   sourceEl.value = DEFAULT_SRC;

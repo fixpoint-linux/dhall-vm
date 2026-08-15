@@ -3,62 +3,175 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>dhall-c — a subset of Dhall, in C, running in your browser</title>
-  <meta name="description" content="dhall-c is a pure-C subset interpreter for the Dhall configuration language. This page runs it as WASM, in your browser — no server.">
+  <title>dhall-c — a Dhall subset in C · one binary, every OS · one .wasm, your browser</title>
+  <meta name="description" content="dhall-c is a pure-C11 subset interpreter for the Dhall configuration language. One C source, two targets: a single cosmocc APE binary (dhall.com) that runs natively on Linux/macOS/Windows/BSD, and a WebAssembly build that runs 100% in your browser.">
+  <meta name="theme-color" content="#0b0e14">
+  <meta property="og:title" content="dhall-c — a Dhall subset in C">
+  <meta property="og:description" content="One C source, two targets: a single native APE binary for every major OS, and a WebAssembly build that runs in your browser.">
+  <meta property="og:type" content="website">
   <link rel="stylesheet" href="style.css">
+  <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <span class="logo">dhall<span class="logo-accent">-c</span></span>
-      <nav>
+      <a class="logo" href="#top">
+        <span class="logo-mark" aria-hidden="true">λ</span>
+        <span>dhall<span class="logo-accent">-c</span></span>
+        <span class="logo-ver">v0.1</span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#targets">Two targets</a>
         <a href="#demo">Live demo</a>
         <a href="#features">Features</a>
         <a href="#examples">Examples</a>
         <a href="#benchmark">Benchmark</a>
-        <a href="#quickstart">Quickstart</a>
+        <a href="#quickstart">Build</a>
       </nav>
     </div>
   </header>
 
-  <section class="hero">
+  <section class="hero" id="top">
     <div class="wrap">
-      <h1>A subset of <span class="accent">Dhall</span>, written in <span class="accent">C</span>.</h1>
+      <p class="eyebrow">Dhall · C11 · one source, many targets</p>
+      <h1>A Dhall subset,<br>written in <span class="grad">C</span>.</h1>
       <p class="lead">
-        Typecheck, normalize, and serialize Dhall configuration — right here, in your browser,
-        compiled to <strong>WebAssembly</strong>. No server, no build step, no upload:
-        your code never leaves this tab.
+        Typecheck, normalize, and serialize Dhall configuration. The <strong>same C interpreter</strong>
+        ships two ways: a single <strong>native binary</strong> that runs on every major OS, and a
+        <strong>WebAssembly</strong> build that runs right here in your browser.
       </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#demo">
+          <span class="btn-glyph" aria-hidden="true">▶</span> Run it in your browser
+        </a>
+        <a class="btn btn-ghost" href="#targets">
+          <span class="btn-glyph" aria-hidden="true">↓</span> Get the native binary
+        </a>
+      </div>
       <ul class="badges">
-        <li>WASM · runs 100% client-side</li>
-        <li>Pure C11, zero dependencies</li>
-        <li>Single static page on GitHub Pages</li>
+        <li><b>dhall.com</b> · one APE binary, many platforms</li>
+        <li><b>dhall.wasm</b> · 100% client-side, no server</li>
+        <li>Pure C11 · zero runtime dependencies</li>
       </ul>
-      <a class="btn" href="#demo">Try it now ↓</a>
+      <div class="terminal" role="img" aria-label="A terminal session running dhall.com and make wasm">
+        <div class="term-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span class="term-title">dhall-c — terminal</span>
+        </div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">$</span> ./dhall.com to-json config.dhall</div>
+          <div class="term-line out">{"host":"example.com","port":443,"tls":true}</div>
+          <div class="term-line"><span class="prompt">$</span> make wasm <span class="term-comment"># same C source → WebAssembly</span></div>
+          <div class="term-line out">docs/dhall.js + docs/dhall.wasm <span class="cursor" aria-hidden="true">▌</span></div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <section class="section" id="demo">
+  <section class="section reveal" id="targets">
     <div class="wrap">
+      <p class="eyebrow">One source · two targets</p>
+      <h2>Compiled once for C.<br>Delivered two ways.</h2>
+      <p class="sub">
+        The same lexer, parser, normalizer, and typechecker (<code>src/*.c</code>) build into two
+        artifacts that cover the entire spectrum — from your terminal to a browser tab.
+      </p>
+
+      <div class="flow" role="img" aria-label="How the C source splits into a native APE and WebAssembly">
+        <pre><code><span class="f-src">src/*.c</span>  <span class="f-mut">— the interpreter · lexer · parser · normalize · typecheck · serialize · import</span>
+
+        <span class="f-tree">├─</span> <span class="f-main">src/main.c</span>  <span class="f-mut">→ cosmocc    →</span> <span class="f-main">dhall.com</span>   <span class="f-mut">one binary, many OSes</span>
+        <span class="f-tree">└─</span> <span class="f-wasm">src/wasm.c</span>  <span class="f-mut">→ emscripten →</span> <span class="f-wasm">dhall.wasm</span>  <span class="f-mut">zero-install, in your browser</span></code></pre>
+      </div>
+
+      <div class="targets">
+        <article class="target target-native">
+          <div class="target-head">
+            <span class="target-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9.5l3 2.5-3 2.5"/><path d="M12 15h5"/></svg>
+            </span>
+            <div>
+              <h3>Native binary — <code>dhall.com</code></h3>
+              <span class="chip chip-native">APE · cosmocc</span>
+            </div>
+          </div>
+          <p class="target-desc">
+            A single self-contained <strong>~1&nbsp;MB</strong> polyglot binary — an
+            <em>Actually Portable Executable</em> built with <code>cosmocc</code> (Cosmopolitan libc).
+            The same file runs natively, no VM, no runtime, no recompile:
+          </p>
+          <ul class="os-list">
+            <li>Linux</li><li>macOS</li><li>Windows</li><li>FreeBSD</li><li>NetBSD</li><li>OpenBSD</li>
+          </ul>
+          <p class="target-note">…and any other <code>x86-64</code> platform cosmocc targets.</p>
+          <p class="target-desc">
+            The full CLI: file and <code>env:</code> imports, and <code>http://</code> URL imports
+            with <code>sha256:</code> verification and SSRF-safe fetch.
+          </p>
+          <div class="target-code"><pre><code>$ ./dhall.com to-json config.dhall
+$ make          <span class="term-comment"># builds dhall.com</span></code></pre></div>
+          <a class="btn btn-ghost btn-sm" href="#quickstart">Build &amp; usage</a>
+        </article>
+
+        <article class="target target-wasm">
+          <div class="target-head">
+            <span class="target-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 2.6 15 0 18"/><path d="M12 3c-2.6 2.6-2.6 15 0 18"/></svg>
+            </span>
+            <div>
+              <h3>In the browser — <code>dhall.wasm</code></h3>
+              <span class="chip chip-wasm">WebAssembly</span>
+            </div>
+          </div>
+          <p class="target-desc">
+            The same interpreter compiled to a <strong>122&nbsp;KB</strong> <code>.wasm</code> module
+            (<code>dhall.js</code> + <code>dhall.wasm</code>). It runs <strong>100% client-side</strong> —
+            no server, no build step, no upload. Your config never leaves the tab.
+          </p>
+          <p class="target-note">
+            In the sandbox there is no filesystem or network, so file/URL imports are unavailable
+            (they resolve as <em>absent</em>); everything else is identical to the native build.
+          </p>
+          <div class="target-code"><pre><code>$ make wasm     <span class="term-comment"># → docs/dhall.js + dhall.wasm</span>
+$ node tests/wasm-smoke.js</code></pre></div>
+          <a class="btn btn-primary btn-sm" href="#demo">Try the live demo ↓</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" id="demo">
+    <div class="wrap">
+      <p class="eyebrow">WebAssembly · runs in this tab</p>
       <h2>Live demo</h2>
-      <p class="sub">Pick a mode, then edit the source. Press <kbd>Run</kbd> or <kbd>Ctrl/⌘+Enter</kbd>.</p>
+      <p class="sub">
+        Pick a mode, then edit the source. Press <kbd>Run</kbd> or <kbd>Ctrl/⌘</kbd>+<kbd>Enter</kbd>.
+      </p>
 
       <div class="demo">
+        <div class="window-bar">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span class="window-title">dhall — in your browser</span>
+          <span class="window-badge">wasm</span>
+        </div>
         <div class="demo-bar">
-          <div class="modes" id="modes" role="tablist">
+          <div class="modes" id="modes" role="tablist" aria-label="Interpreter mode">
             <button data-mode="0" class="mode active" role="tab" aria-selected="true">typecheck</button>
             <button data-mode="1" class="mode" role="tab">normalize</button>
             <button data-mode="2" class="mode" role="tab">to-json</button>
             <button data-mode="3" class="mode" role="tab">to-toml</button>
             <button data-mode="4" class="mode" role="tab">to-yaml</button>
           </div>
-          <button class="btn run" id="runBtn">Run</button>
+          <div class="demo-actions">
+            <button class="btn btn-ghost btn-sm" id="copyBtn" title="Copy the result">Copy</button>
+            <button class="btn btn-primary run" id="runBtn">Run</button>
+          </div>
         </div>
 
         <div class="panes">
           <div class="pane">
             <label for="source">Dhall source</label>
-            <textarea id="source" spellcheck="false" autocomplete="off"
+            <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"
               placeholder="{ greeting = &quot;Hello, &quot; ++ &quot;world!&quot;, count = 1 + 2 }"></textarea>
           </div>
           <div class="pane">
@@ -68,83 +181,174 @@
         </div>
 
         <div class="demo-foot">
-          <span class="status" id="status">loading WASM…</span>
-          <div class="examples" id="examplesChips"></div>
+          <span class="status" id="status">loading wasm…</span>
+          <div class="examples" id="examplesChips" aria-label="Load an example"></div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="section alt" id="features">
+  <section class="section reveal" id="features">
     <div class="wrap">
-      <h2>What it does</h2>
+      <p class="eyebrow">What it does</p>
+      <h2>A capable Dhall subset</h2>
+      <p class="sub">A single-term de&nbsp;Bruijn core, eager normalization, bidirectional typechecking — no shortcuts.</p>
       <div class="grid">
-        <div class="card"><h3>Typecheck</h3><p>Bidirectional inference with helpful <code>Error: … at line N, col M</code> messages.</p></div>
-        <div class="card"><h3>Normalize</h3><p>Eager, step-sound normal forms for a single-term de&nbsp;Br&#252;ijn core.</p></div>
-        <div class="card"><h3>Serializers</h3><p>One value tree → <strong>JSON</strong>, <strong>TOML</strong>, and <strong>YAML</strong> output.</p></div>
-        <div class="card"><h3>Imports</h3><p><code>./x</code> and <code>env:NAME</code> (file imports disabled in the browser).</p></div>
-        <div class="card"><h3>Optional / Some</h3><p><code>Some</code>, <code>None</code>, and pattern-free optional handling.</p></div>
-        <div class="card"><h3>Arithmetic</h3><p><code>Natural</code> arithmetic on <strong>arbitrary-precision</strong> big ints.</p></div>
-        <div class="card"><h3>assert</h3><p><code>assert :</code> type-level checks that fail fast.</p></div>
-        <div class="card"><h3>toMap</h3><p>Turn record field sets into <code>List</code> map entries.</p></div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">✓</span>
+          <h3>Typecheck</h3>
+          <p>Bidirectional inference with precise <code>Error: … at line N, col M</code> diagnostics.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">λ</span>
+          <h3>Normalize</h3>
+          <p>Eager, step-sound normalization over a de&nbsp;Bruijn core; normal forms re-parse and round-trip.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">∞</span>
+          <h3>Arbitrary precision</h3>
+          <p><code>Natural</code> and <code>Integer</code> are unbounded big ints — <code>+ − ×</code> never overflow, and <code>Natural</code> subtraction saturates at 0.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">⤵</span>
+          <h3>Imports</h3>
+          <p><code>./file</code>, <code>env:NAME</code>, and <code>http://</code> URLs with mandatory <code>sha256:</code> hashes, SSRF-safe fetch, and <code>?</code> fallback.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">{}</span>
+          <h3>Serializers</h3>
+          <p>One evaluated value tree → <strong>JSON</strong>, <strong>TOML</strong>, and <strong>YAML</strong> (block style).</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">⊞</span>
+          <h3>Records &amp; unions</h3>
+          <p>Recursive <code>/\</code> merge, right-biased <code>//</code>, <code>with</code> updates, <code>merge</code>, and <code>toMap</code> — including the empty record.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">[]</span>
+          <h3>Lists &amp; builtins</h3>
+          <p><code>List/map</code>, <code>filter</code>, <code>fold</code>, <code>build</code>, <code>length</code>, <code>head</code>, <code>last</code>, <code>indexed</code>, <code>reverse</code>, plus <code>Natural/build</code> and <code>Optional/fold</code>.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">!</span>
+          <h3>assert</h3>
+          <p><code>assert :</code> type-level checks, enforced in <em>every</em> mode — typecheck, normalize, and all three serializers.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">∀</span>
+          <h3>Unicode operators</h3>
+          <p><code>λ</code> <code>→</code> <code>∀</code> <code>∧</code> <code>⫽</code> <code>≡</code> are accepted alongside their ASCII spellings.</p>
+        </div>
+        <div class="card">
+          <span class="icon" aria-hidden="true">≈</span>
+          <h3>Round-trip Doubles</h3>
+          <p>IEEE 754 <code>Double</code> printed with the shortest representation that round-trips; non-finite maps to <code>null</code>/<code>nan</code>/<code>inf</code>.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="section" id="examples">
+  <section class="section alt reveal" id="examples">
     <div class="wrap">
+      <p class="eyebrow">Real configs</p>
       <h2>Examples</h2>
       <p class="sub">Click one to load it into the demo (fetched from <code>examples/</code>).</p>
       <div class="ex-cards" id="exCards"></div>
     </div>
   </section>
 
-  <section class="section alt" id="benchmark">
+  <section class="section reveal" id="benchmark">
     <div class="wrap">
+      <p class="eyebrow">Performance</p>
       <h2>Benchmark</h2>
       <p class="sub">
         Representative per-phase timings over a ~20-field nested record, a 200-element list,
-        a <code>let</code>/lambda, and a <code>merge</code>. Built with <code>make bench</code>
-        (<code>bench.com.dbg</code>, x86-64).
+        a <code>let</code>/lambda, and a <code>merge</code>. Measured with <code>./bench.com.dbg</code>
+        (in-process, x86-64, cosmocc).
       </p>
-      <table class="bench">
-        <thead><tr><th>phase</th><th>ns/op</th><th>ops/s</th></tr></thead>
-        <tbody>
-          <tr><td>parse</td><td>23,080</td><td>43,327</td></tr>
-          <tr><td>normalize</td><td>277,351</td><td>3,606</td></tr>
-          <tr><td>typecheck</td><td>16,721</td><td>59,805</td></tr>
-          <tr><td>serialize (to-json)</td><td>28,977</td><td>34,510</td></tr>
-        </tbody>
-      </table>
+      <div class="bench-wrap">
+        <table class="bench">
+          <thead><tr><th>phase</th><th>ns/op</th><th>ops/s</th></tr></thead>
+          <tbody>
+            <tr><td>parse</td><td>23,130</td><td>43,235</td></tr>
+            <tr><td>normalize</td><td>285,445</td><td>3,503</td></tr>
+            <tr><td>typecheck</td><td>5,246</td><td>190,618</td></tr>
+            <tr><td>serialize (to-json)</td><td>22,408</td><td>44,627</td></tr>
+          </tbody>
+        </table>
+        <p class="bench-note">
+          Built with <code>make bench</code>; timings are a measurement tool, not a correctness check.
+        </p>
+      </div>
     </div>
   </section>
 
-  <section class="section" id="quickstart">
+  <section class="section alt reveal" id="quickstart">
     <div class="wrap">
+      <p class="eyebrow">Build &amp; run</p>
       <h2>Quickstart</h2>
-      <p>Build the native binary (a Cosmopolitan <code>APE</code>) and run the whole test suite:</p>
-      <pre><code>make            # dhall.com (APE) + dhall.com.dbg (ELF)
-make test       # run.sh + roundtrip.sh + examples.sh + cli.sh</code></pre>
-      <p>Usage:</p>
-      <pre><code>dhall typecheck [file|-]   # infer the type of an expression
-dhall normalize [file|-]   # print the normal form
-dhall to-json   [file|-]   # evaluate to JSON
-dhall to-toml   [file|-]   # evaluate to TOML (top level must be a record)
-dhall to-yaml   [file|-]   # evaluate to YAML (block style, 1.2 core schema)</code></pre>
-      <p>Rebuild the in-browser WASM (requires <code>emscripten clang lld llvm</code>):</p>
-      <pre><code>make wasm            # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
-node tests/wasm-smoke.js   # headless browser-API smoke test (8 checks)</code></pre>
+      <p class="sub">Requires <code>cosmocc</code> (Cosmopolitan toolchain). Build the native APE and run the full suite:</p>
+
+      <div class="code-cols">
+        <div class="code-col">
+          <h3>Native — <code>make</code></h3>
+          <pre><code>make            <span class="term-comment"># dhall.com (APE) + dhall.com.dbg (ELF)</span>
+make test       <span class="term-comment"># run.sh + roundtrip.sh + examples.sh + cli.sh</span>
+make bench      <span class="term-comment"># in-process benchmark</span></code></pre>
+        </div>
+        <div class="code-col">
+          <h3>Browser — <code>make wasm</code></h3>
+          <pre><code>make wasm               <span class="term-comment"># → docs/dhall.js + dhall.wasm</span>
+node tests/wasm-smoke.js <span class="term-comment"># headless smoke test</span></code></pre>
+          <p class="col-note">Needs <code>emscripten clang lld llvm</code>.</p>
+        </div>
+      </div>
+
+      <h3 class="usage-h">Usage</h3>
+      <pre><code>dhall typecheck [file|-]   <span class="term-comment"># infer the type of an expression</span>
+dhall normalize [file|-]   <span class="term-comment"># print the normal form</span>
+dhall to-json   [file|-]   <span class="term-comment"># evaluate to JSON</span>
+dhall to-toml   [file|-]   <span class="term-comment"># evaluate to TOML (top level must be a record)</span>
+dhall to-yaml   [file|-]   <span class="term-comment"># evaluate to YAML (block style, 1.2 core schema)</span></code></pre>
     </div>
   </section>
 
   <footer class="footer">
-    <div class="wrap">
-      <p>dhall-c — a pure-C subset of the <a href="https://dhall-lang.org/">Dhall</a> configuration language.
-      This page is the interpreter itself compiled to WebAssembly and served statically from <code>docs/</code>.</p>
+    <div class="wrap footer-inner">
+      <div>
+        <p class="footer-logo">λ dhall<span class="logo-accent">-c</span></p>
+        <p>A pure-C11 subset of the <a href="https://dhall-lang.org/">Dhall</a> configuration language.
+          One C source, two targets: a single native APE binary and a WebAssembly build.
+          This page is the interpreter itself compiled to WebAssembly, served statically from <code>docs/</code>.</p>
+      </div>
+      <div class="footer-meta">
+        <span>built with <code>cosmocc</code></span>
+        <span>·</span>
+        <span>runs in your browser via <code>emscripten</code></span>
+      </div>
     </div>
   </footer>
 
   <script src="dhall.js"></script>
   <script src="app.js"></script>
+  <script>
+    /* Progressive enhancement: scroll-reveal. Safe to drop — content is visible
+     * without JS (no `.js` class) and always revealed under reduced-motion/no-IO. */
+    (function () {
+      var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+      if (!els.length) return;
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce || !('IntersectionObserver' in window)) {
+        els.forEach(function (el) { el.classList.add('in'); });
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+      els.forEach(function (el) { io.observe(el); });
+    })();
+  </script>
 </body>
 </html>
