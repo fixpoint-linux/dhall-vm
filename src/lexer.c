@@ -360,6 +360,30 @@ static Token tokenize(Lexer *lx) {
         lexer_read_char(lx);
         return emit(lx, T_ARROW, sp, NULL);
     }
+    /* ∀ U+2200 -> `forall` keyword; ∧ U+2227 -> /\ T_MERGE; ≡ U+2261 -> ==
+       T_EQEQ; ⫽ U+2AFD -> // T_PREFER.  Emit the existing tokens so the parser
+       needs no change.  (⫽, not ∨, is the Unicode form of prefer per dhall.abnf;
+       ∨/≢ are not Dhall operators.) */
+    if (c == 0xE2 && lx->pos + 2 < lx->len) {
+        unsigned char b1 = (unsigned char)lx->src[lx->pos + 1];
+        unsigned char b2 = (unsigned char)lx->src[lx->pos + 2];
+        if (b1 == 0x88 && b2 == 0x80) {      /* ∀ U+2200 forall */
+            lexer_read_char(lx); lexer_read_char(lx); lexer_read_char(lx);
+            return emit(lx, T_NAME, sp, arena_strdup(dhall_arena, "forall"));
+        }
+        if (b1 == 0x88 && b2 == 0xA7) {      /* ∧ U+2227 combine */
+            lexer_read_char(lx); lexer_read_char(lx); lexer_read_char(lx);
+            return emit(lx, T_MERGE, sp, NULL);
+        }
+        if (b1 == 0x89 && b2 == 0xA1) {      /* ≡ U+2261 equivalence */
+            lexer_read_char(lx); lexer_read_char(lx); lexer_read_char(lx);
+            return emit(lx, T_EQEQ, sp, NULL);
+        }
+        if (b1 == 0xAB && b2 == 0xBD) {      /* ⫽ U+2AFD prefer */
+            lexer_read_char(lx); lexer_read_char(lx); lexer_read_char(lx);
+            return emit(lx, T_PREFER, sp, NULL);
+        }
+    }
 
     /* symbols */
     lexer_read_char(lx);

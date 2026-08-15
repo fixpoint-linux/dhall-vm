@@ -130,9 +130,12 @@ bidirectional typechecking) includes:
   `\n`. `normalize` prints the desugared double-quoted form
   (e.g. `''` + newline + `  foo` + newline + `  ''` normalizes to `"foo\n"`),
   which re-parses and round-trips.
-- **Unicode operators** `λ` (U+03BB) and `→` (U+2192) are accepted as
-  alternatives to `\` and `->` (the ASCII forms still work). Other Unicode
-  operator glyphs (`∀`, `∧`, `⫽`, `≡`, …) are not yet supported.
+- **Unicode operators** `λ` (U+03BB), `→` (U+2192), `∀` (U+2200), `∧` (U+2227),
+  `⫽` (U+2AFD) and `≡` (U+2261) are accepted as alternatives to `\`, `->`,
+  `forall`, `/\`, `//` and `==` respectively (the ASCII forms still work).
+  `⫽` — not `∨` — is the Unicode form of `//` (prefer), matching the Dhall
+  standard (dhall.abnf); `∨` (U+2228) and `≢` (U+2262) are not Dhall operators
+  and are rejected.
 
 ### Arithmetic semantics
 
