@@ -178,8 +178,9 @@ and `None T` as `null`.
 `toMap r` where `r : { a : V, b : V, ... }` produces
 `List { mapKey : Text, mapValue : V }`, one element per record field in
 sorted label order. All field values must share a common type (a type
-error otherwise), and the record must be non-empty (a deliberate deviation
-from Dhall, which needs polymorphism this subset lacks).
+error otherwise). `toMap` of the empty record literal (`{=}` or `{}`)
+yields the empty list `[]`; because the element type `V` is unknowable
+there, an annotation is required — `toMap {=} : List { mapKey : Text, mapValue : V }`.
 
 ## Imports
 

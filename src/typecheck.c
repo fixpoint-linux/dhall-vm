@@ -627,6 +627,24 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
             }
         return true;
     }
+    if (t->tag == TmToMap) {
+        /* toMap of an EMPTY record: the element type V is unknowable under
+           infer (no fields to read it from), so take V from the annotation.
+           Succeeds iff the record normalizes to an empty record literal AND
+           the target is List { mapKey : Text, mapValue : V } for some V.
+           Any other case falls through to infer (non-empty records, or a
+           mismatched/malformed target). */
+        Term *nr = normalize(t->as.tomap.rec);
+        if (nr->tag == TmRecordLit && nr->as.rec.n == 0 && is_list_type(nty)) {
+            Term *elem = normalize(nty->as.app.arg);
+            if (elem->tag == TmRecordType && elem->as.rec.n == 2 &&
+                elem->as.rec.fs[0].type && elem->as.rec.fs[1].type &&
+                !strcmp(elem->as.rec.fs[0].label, "mapKey") &&
+                !strcmp(elem->as.rec.fs[1].label, "mapValue") &&
+                alpha_eq(normalize(elem->as.rec.fs[0].type), normalize(tm_builtin("Text"))))
+                return true;
+        }
+    }
     Term *got = infer(g, t, err);
     if (!got) return false;
     Term *ngot = normalize(got);
