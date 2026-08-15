@@ -129,8 +129,9 @@ $ make          <span class="term-comment"># builds dhall.com</span></code></pre
             no server, no build step, no upload. Your config never leaves the tab.
           </p>
           <p class="target-note">
-            In the sandbox there is no filesystem or network, so file/URL imports are unavailable
-            (they resolve as <em>absent</em>); everything else is identical to the native build.
+            File imports are unavailable (no filesystem in the browser), but <code>http://</code>
+            imports <strong>work</strong> — fetched live with the browser's <code>fetch</code>
+            (subject to CORS) and verified by their mandatory <code>sha256:</code> hash.
           </p>
           <div class="target-code"><pre><code>$ make wasm     <span class="term-comment"># → docs/dhall.js + dhall.wasm</span>
 $ node tests/wasm-smoke.js</code></pre></div>
@@ -146,6 +147,8 @@ $ node tests/wasm-smoke.js</code></pre></div>
       <h2>Live demo</h2>
       <p class="sub">
         Pick a mode, then edit the source. Press <kbd>Run</kbd> or <kbd>Ctrl/⌘</kbd>+<kbd>Enter</kbd>.
+        You can even paste an <code>http://…</code> import with a <code>sha256:</code> hash — the
+        browser fetches it live (cross-origin requests need CORS headers on the target).
       </p>
 
       <div class="demo">
@@ -212,7 +215,7 @@ $ node tests/wasm-smoke.js</code></pre></div>
         <div class="card">
           <span class="icon" aria-hidden="true">⤵</span>
           <h3>Imports</h3>
-          <p><code>./file</code>, <code>env:NAME</code>, and <code>http://</code> URLs with mandatory <code>sha256:</code> hashes, SSRF-safe fetch, and <code>?</code> fallback.</p>
+          <p><code>./file</code>, <code>env:NAME</code>, and <code>http://</code> URLs with mandatory <code>sha256:</code> hashes and <code>?</code> fallback — in the native binary (SSRF-safe) <em>and</em> in the browser (via <code>fetch</code>, CORS permitting).</p>
         </div>
         <div class="card">
           <span class="icon" aria-hidden="true">{}</span>
