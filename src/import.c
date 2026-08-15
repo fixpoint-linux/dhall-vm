@@ -103,8 +103,14 @@ void import_loader_push_root(ImportLoader *l, const char *root_file) {
             l->dirs[l->dn++] = path_dirname(canonical);
             return;
         }
+        /* root file does not exist yet (e.g. an unsaved LSP buffer): still
+           resolve relative imports against the literal path's directory,
+           rather than silently against CWD. */
+        if (l->dn == l->dcap) { l->dcap = l->dcap ? l->dcap * 2 : 8; l->dirs = realloc(l->dirs, l->dcap * sizeof(char *)); }
+        l->dirs[l->dn++] = path_dirname(root_file);
+        return;
     }
-    /* stdin or unresolvable root: relative imports resolve against CWD */
+    /* stdin (no root file): relative imports resolve against CWD */
     if (l->dn == l->dcap) { l->dcap = l->dcap ? l->dcap * 2 : 8; l->dirs = realloc(l->dirs, l->dcap * sizeof(char *)); }
     l->dirs[l->dn++] = xstrdup(".");
 }

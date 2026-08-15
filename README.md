@@ -87,6 +87,42 @@ Dhall expressions in a textarea, and loads the `examples/*.dhall` files.
 `src/wasm.c` provides the browser-callable entry point and is deliberately kept
 out of the native cosmocc build (`Makefile` `SRC`).
 
+## Language Server
+
+A Language Server Protocol (LSP) server (`dhall-lsp.com`) gives editors live
+diagnostics and hover types. It speaks JSON-RPC 2.0 over stdio with
+Content-Length framing, reusing the interpreter core (`parse_source` /
+`infer_type` / `normalize`) for everything it reports.
+
+```
+make dhall-lsp.com        # produces dhall-lsp.com (APE) + dhall-lsp.com.dbg (ELF)
+make test-lsp             # runs tests/lsp.sh (6 end-to-end checks)
+```
+
+Point your editor's LSP client at the `.dbg` binary (plain static ELF, no APE
+loader needed) with the `dhall` filetype, e.g. for Neovim's `vim.lsp.start`:
+
+```lua
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "dhall",
+  callback = function()
+    vim.lsp.start({
+      name = "dhall-lsp",
+      cmd = { vim.fn.getcwd() .. "/dhall-lsp.com.dbg" },
+    })
+  end,
+})
+```
+
+**Supported:** diagnostics-as-you-type (parse errors, type errors, and
+normalize errors, with the span mapped to a 0-based LSP range) and hover (the
+whole document's normalized type, rendered as Dhall).
+
+**Limitations:** hover reports the whole-document type only (sub-expression
+hover is not yet implemented); documents use full sync (`didOpen`/`didChange`
+send the entire text); no completion yet; `file://` URIs are not
+percent-decoded (paths with spaces are unsupported).
+
 ## Language features
 
 The supported subset (single-term de Bruijn core, eager normalization,
