@@ -20,9 +20,14 @@
    The pure string helpers url_dirname()/url_join() live here (NOT in ssrf.c)
    so import.c can resolve nested relative imports inside a URL document without
    pulling socket headers into the wasm build — this TU is compiled for wasm
-   with the socket code #ifndef'd out (http_fetch returns HTTP_ABSENT there). */
+   with the socket code #ifndef'd out (the wasm path fetches via a synchronous
+   XMLHttpRequest instead). */
 #include "dhall.h"
 #include "ssrf.h"
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -602,10 +607,53 @@ static int http_fetch_impl(FetchCtx *ctx, const char *url, char **body, size_t *
 
 int http_fetch(const char *url, char **body, size_t *len, DhallError *err) {
 #ifdef __EMSCRIPTEN__
-    (void)url; (void)body; (void)len;
-    dhall_error_set(err, ERR_MISSING, SPAN_NONE,
-                    "missing import: network unavailable (URL imports are not supported in wasm)");
-    return HTTP_ABSENT;
+    if (body) *body = NULL;
+    if (len) *len = 0;
+
+    /* Browser/wasm: fetch via a SYNCHRONOUS XMLHttpRequest on the main thread.
+       This blocks the page for the duration of the request (imports are inlined
+       at parse time, so the interpreter is already synchronous); it is
+       deprecated but still supported in all major browsers. emscripten_fetch()'s
+       synchronous mode is NOT used here because Emscripten refuses it on the
+       main browser thread (returns NULL) — see README "URL imports in the
+       browser". The browser owns connectivity (no SSRF gate); cross-origin
+       requests are subject to CORS (status 0 => ABSENT, recoverable by '?').
+       sha256: is still required and verified by import.c (unchanged).
+
+       The JS fills a 12-byte result slot [status, body_ptr, body_len] (3 ints);
+       status is the HTTP status (2xx success), 0 on network/CORS failure, or
+       -1 if the XHR threw (security/mixed-content error). */
+    int slot[3] = { 0, 0, 0 };
+    EM_ASM("var url = UTF8ToString($0); var out = $1; var status = 0, ptr = 0, len = 0; try { var xhr = new XMLHttpRequest(); xhr.open('GET', url, false); xhr.responseType = 'arraybuffer'; xhr.send(null); status = xhr.status; if (status >= 200 && status < 300) { var buf = xhr.response; len = buf ? buf.byteLength : 0; ptr = _malloc(len + 1); if (ptr) { if (len > 0) HEAPU8.set(new Uint8Array(buf), ptr); HEAPU8[ptr + len] = 0; } } } catch (e) { status = -1; } HEAP32[out >> 2] = status; HEAP32[(out + 4) >> 2] = ptr; HEAP32[(out + 8) >> 2] = len;", url, slot);
+
+    int status = slot[0];
+    char *bptr = (char *)(intptr_t)slot[1];
+    size_t blen = (size_t)slot[2];
+
+    if (status < 0 || status == 0) {
+        dhall_error_set(err, ERR_MISSING, SPAN_NONE,
+                        "missing import: fetch failed for '%s' (CORS or network error)", url);
+        if (bptr) free(bptr);
+        return HTTP_ABSENT;
+    }
+    if (status < 200 || status >= 300) {
+        dhall_error_set(err, ERR_MISSING, SPAN_NONE,
+                        "missing import: HTTP %d from '%s'", status, url);
+        if (bptr) free(bptr);
+        return HTTP_ABSENT;
+    }
+    if (blen > HTTP_MAX_BODY) {
+        dhall_error_set(err, ERR_IO, SPAN_NONE, "response from '%s' exceeds 16 MiB", url);
+        if (bptr) free(bptr);
+        return HTTP_HARD;
+    }
+    if (!bptr) {
+        dhall_error_set(err, ERR_IO, SPAN_NONE, "out of memory");
+        return HTTP_HARD;
+    }
+    *body = bptr;
+    *len = blen;
+    return HTTP_OK;
 #else
     if (body) *body = NULL;
     if (len) *len = 0;

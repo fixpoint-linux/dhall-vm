@@ -73,6 +73,7 @@ code never leaves the browser). Build it with:
 ```
 make wasm           # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
 node tests/wasm-smoke.js   # headless browser-API smoke test (run by `make wasm`)
+node tests/wasm-fetch.js   # opt-in URL-import fetch test (needs a loopback socket)
 ```
 
 `make wasm` needs `emscripten clang lld llvm` (on Arch: `pacman -S emscripten
@@ -246,8 +247,27 @@ http://host/x.dhall sha256:<64hex>
   oversized response is a *hard* error (not recoverable).
 - Query strings and fragments are not supported in URL imports (the `?` and `#`
   are not part of the import; percent-encode them, or add a trailing path).
-- In the WebAssembly build there is no network access: a URL import is reported
-  absent (`network unavailable`), so `?` can recover it.
+
+### URL imports in the browser
+
+In the WebAssembly/browser build, `http://` imports are fetched with a
+**synchronous XMLHttpRequest on the main thread**; this blocks the page for the
+duration of the request (imports are inlined at parse time, so the interpreter
+is already synchronous). It is deprecated but still supported in all major
+browsers, and cannot be timed out. `emscripten_fetch()`'s synchronous mode is
+**not** used here because Emscripten refuses it on the main browser thread
+(returns NULL), so the build drives the XHR directly.
+
+- **CORS**: a cross-origin `http` import only succeeds if the target sends CORS
+  headers (`Access-Control-Allow-Origin`); otherwise it is reported **absent**
+  and is recoverable by `?`. Same-origin fetches (files served alongside the
+  page) work, provided the page itself is not a secure (`https://`) origin that
+  blocks `http://` subresources as mixed content.
+- **Security-model difference**: the native `getaddrinfo`/private-IP SSRF gate
+  does **not** apply to the wasm path — the browser owns connectivity and
+  enforces its own network policy (same-origin / CORS / mixed-content).
+  Integrity therefore rests entirely on the mandatory `sha256:` hash, which is
+  still required and verified on fetch.
 
 ### sha256: hash deviation
 
