@@ -42,6 +42,7 @@ test-lsp: dhall-lsp.com
 wasm:
 	./scripts/build-wasm.sh
 	@node tests/wasm-smoke.js
+	@node tests/lsp-wasm-smoke.js
 
 # Offline unit test for the SSRF classifier + url_parse (src/ssrf.c). This is
 # the security crux: 36 classification vectors + url_parse vectors, deterministic

@@ -371,3 +371,41 @@ pre code { background: none; border: none; padding: 0; color: #d8dde6; font-size
   .section { padding: 56px 0; }
   .hero { padding: 60px 0 56px; }
 }
+
+/* ---- LSP demo ---- */
+.lsp-demo .window-bar { padding: 11px 14px; border-bottom: 1px solid var(--border-soft); }
+.lsp-editor-wrap {
+  position: relative; overflow: hidden; background: #0d1119;
+}
+.lsp-highlight {
+  position: absolute; inset: 0; overflow: auto; pointer-events: none;
+  font-family: var(--mono); font-size: 0.88rem; line-height: 1.55;
+  padding: 13px; box-sizing: border-box; color: var(--text);
+  white-space: pre-wrap; word-wrap: break-word;
+}
+.lsp-highlight .err {
+  text-decoration: underline wavy var(--error) 1px; text-underline-offset: 3px;
+  background: rgba(248, 113, 113, 0.12); border-radius: 2px;
+}
+#lspSource {
+  position: relative; display: block; width: 100%; height: 300px; resize: none;
+  background: transparent; color: transparent; caret-color: var(--accent);
+  border: none; border-radius: 0; font-size: 0.88rem; line-height: 1.55;
+  padding: 13px; box-sizing: border-box; white-space: pre-wrap; word-wrap: break-word;
+}
+#lspSource:focus { box-shadow: none; }
+#lspSource::placeholder { color: #3a4660; }
+.lsp-tooltip {
+  position: absolute; z-index: 5; max-width: 480px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-family: var(--mono); font-size: 0.8rem; pointer-events: none;
+  color: var(--text); box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.9);
+}
+.lsp-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 16px; border-top: 1px solid var(--border); flex-wrap: wrap;
+}
+.lsp-type { color: var(--accent-2); font-family: var(--mono); font-size: 0.8rem; }
+.lsp-diagnostics { border-top: 1px solid var(--border-soft); padding: 10px 16px; min-height: 24px; font-family: var(--mono); font-size: 0.8rem; }
+.lsp-diag.err { color: var(--error); margin: 2px 0; }
+.lsp-diag.ok { color: var(--green); }

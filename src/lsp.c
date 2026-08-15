@@ -1,44 +1,65 @@
 /* lsp.c — Language Server Protocol server for the Dhall subset interpreter
    (MVP). Speaks JSON-RPC 2.0 over stdio with Content-Length framing; a single
    synchronous loop. Reuses the interpreter core (parse_source / infer_type /
-   normalize / print_term) for diagnostics + hover. */
+   normalize / print_term) for diagnostics + hover.
+
+   Layering (shared by the native binary and the wasm build):
+     - lsp_handle()      — process one incoming JSON-RPC message; append the
+                           resulting response/notification frame(s) (still
+                           Content-Length framed) to a module-global output
+                           buffer (g_out).
+     - lsp_out()/lsp_out_len() — expose that buffer (the wasm entry reads it;
+                           the native main() flushes it to stdout).
+     - main()            — stdio framing loop (read a frame -> lsp_handle ->
+                           fwrite g_out -> repeat), compiled only for the native
+                           target (the wasm build passes -DLSP_NO_MAIN and
+                           drives lsp_handle directly, mirroring src/wasm.c). */
 #include "dhall.h"
 #include "json.h"
 
-/* Read one frame: header lines until a blank line, then Content-Length bytes. */
-static char *read_frame(void) {
-    long content_length = -1;
-    char line[256];
-    for (;;) {
-        size_t i = 0;
-        int c;
-        while (i + 1 < sizeof line && (c = fgetc(stdin)) != EOF && c != '\n')
-            line[i++] = (char)c;
-        if (c == EOF && i == 0) return NULL;
-        line[i] = '\0';
-        if (i > 0 && line[i - 1] == '\r') line[--i] = '\0';
-        if (i == 0) break;
-        if (strncmp(line, "Content-Length:", 15) == 0)
-            content_length = strtol(line + 15, NULL, 10);
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define LSP_EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define LSP_EXPORT
+#endif
+
+/* ------------------------------------------------------------------ */
+/* Output buffer (module-global, reset at the top of each message)    */
+/* ------------------------------------------------------------------ */
+
+static char  *g_out = NULL;
+static size_t g_out_len = 0;
+static size_t g_out_cap = 0;
+
+static void out_add(const char *s, size_t n) {
+    if (g_out_len + n + 1 > g_out_cap) {
+        size_t cap = g_out_cap ? g_out_cap : 256;
+        while (g_out_len + n + 1 > cap) cap *= 2;
+        g_out = realloc(g_out, cap);
+        if (!g_out) { fputs("dhall-lsp: out of memory\n", stderr); exit(3); }
+        g_out_cap = cap;
     }
-    if (content_length < 0 || content_length > (1 << 24)) return NULL;
-    char *buf = malloc((size_t)content_length + 1);
-    if (!buf) return NULL;
-    size_t got = 0;
-    while (got < (size_t)content_length) {
-        size_t n = fread(buf + got, 1, (size_t)content_length - got, stdin);
-        if (n == 0) { free(buf); return NULL; }
-        got += n;
-    }
-    buf[content_length] = '\0';
-    return buf;
+    memcpy(g_out + g_out_len, s, n);
+    g_out_len += n;
+    g_out[g_out_len] = '\0';
 }
 
+/* Append one Content-Length-framed message (header + body) to g_out. */
 static void write_frame(TmpBuf *b) {
-    printf("Content-Length: %zu\r\n\r\n", b->len);
-    fwrite(b->s, 1, b->len, stdout);
-    fflush(stdout);
+    char hdr[64];
+    int hn = snprintf(hdr, sizeof hdr, "Content-Length: %zu\r\n\r\n", b->len);
+    out_add(hdr, (size_t)hn);
+    out_add(b->s, b->len);
 }
+
+LSP_EXPORT const char *lsp_out(void) { return g_out ? g_out : ""; }
+
+LSP_EXPORT int lsp_out_len(void) { return (int)g_out_len; }
+
+/* ------------------------------------------------------------------ */
+/* Document store (heap, persists across messages)                    */
+/* ------------------------------------------------------------------ */
 
 typedef struct { char *uri; char *text; } Doc;
 static Doc *g_docs; static int g_ndocs, g_cap;
@@ -83,8 +104,19 @@ static const char *uri_to_path(const char *uri) {
     return NULL;
 }
 
-/* print_term writes to a FILE*; capture it as a heap string (caller frees). */
+/* print_term writes to a FILE*; capture it as a heap string (caller frees).
+   Native uses tmpfile(); wasm uses open_memstream (no MEMFS/tmpfile dependency,
+   matching src/wasm.c). */
 static char *term_to_string(Term *t) {
+#ifdef __EMSCRIPTEN__
+    char *s = NULL;
+    size_t n = 0;
+    FILE *f = open_memstream(&s, &n);
+    if (!f) return NULL;
+    print_term(f, t);
+    fclose(f);
+    return s;
+#else
     FILE *f = tmpfile();
     if (!f) return NULL;
     print_term(f, t);
@@ -98,6 +130,7 @@ static char *term_to_string(Term *t) {
     s[r] = '\0';
     fclose(f);
     return s;
+#endif
 }
 
 /* Evaluate the document: parse, infer, normalize the type. On success fills
@@ -211,56 +244,114 @@ static void handle_hover(const Json *id, const Json *params) {
     free(type_str);
 }
 
+/* ------------------------------------------------------------------ */
+/* Message core                                                       */
+/* ------------------------------------------------------------------ */
+
+static bool g_shut_down = false;
+
+/* Process one incoming JSON-RPC message. Appends any resulting frame(s) to the
+   output buffer (exposed via lsp_out/lsp_out_len). Returns true when the server
+   should exit (an "exit" notification was received). */
+LSP_EXPORT bool lsp_handle(const char *json, int len) {
+    g_out_len = 0;                      /* reset output for this message */
+    if (g_out) g_out[0] = '\0';
+
+    if (!dhall_arena) dhall_arena = arena_new();
+
+    Json *root = json_parse(json, (size_t)len);
+    if (!root) return false;
+
+    const char *method = json_str(json_obj_get(root, "method"));
+    Json *id = json_obj_get(root, "id");
+    bool is_request = id && id->type != J_NULL;
+    Json *params = json_obj_get(root, "params");
+
+    bool done = false;
+    if (method && !strcmp(method, "initialize")) {
+        handle_initialize(id);
+    } else if (method && !strcmp(method, "initialized")) {
+        /* no reply */
+    } else if (method && !strcmp(method, "shutdown")) {
+        g_shut_down = true;
+        respond_result(id, "null");
+    } else if (method && !strcmp(method, "exit")) {
+        done = true;
+    } else if (method && !strcmp(method, "textDocument/didOpen")) {
+        const Json *td = json_obj_get(params, "textDocument");
+        const char *uri = td ? json_str(json_obj_get(td, "uri")) : NULL;
+        const char *text = td ? json_str(json_obj_get(td, "text")) : NULL;
+        if (uri && text) handle_doc_change(uri, text);
+    } else if (method && !strcmp(method, "textDocument/didChange")) {
+        const Json *td = json_obj_get(params, "textDocument");
+        const char *uri = td ? json_str(json_obj_get(td, "uri")) : NULL;
+        const Json *cc = json_obj_get(params, "contentChanges");
+        const Json *last = (cc && cc->type == J_ARR && cc->as.arr.n > 0)
+                           ? json_arr_get(cc, cc->as.arr.n - 1) : NULL;
+        const char *text = last ? json_str(json_obj_get(last, "text")) : NULL;
+        if (uri && text) handle_doc_change(uri, text);
+    } else if (method && !strcmp(method, "textDocument/didClose")) {
+        const Json *td = json_obj_get(params, "textDocument");
+        const char *uri = td ? json_str(json_obj_get(td, "uri")) : NULL;
+        if (uri) { docs_remove(uri); publish_diagnostics(uri, NULL); }
+    } else if (method && !strcmp(method, "textDocument/hover")) {
+        handle_hover(id, params);
+    } else if (is_request) {
+        respond_error(id, -32601, "method not found");
+    }
+
+    json_free(root);
+    return done;
+}
+
+/* ------------------------------------------------------------------ */
+/* Native stdio framing (excluded from the wasm build)               */
+/* ------------------------------------------------------------------ */
+
+#ifndef LSP_NO_MAIN
+
+/* Read one frame: header lines until a blank line, then Content-Length bytes. */
+static char *read_frame(void) {
+    long content_length = -1;
+    char line[256];
+    for (;;) {
+        size_t i = 0;
+        int c;
+        while (i + 1 < sizeof line && (c = fgetc(stdin)) != EOF && c != '\n')
+            line[i++] = (char)c;
+        if (c == EOF && i == 0) return NULL;
+        line[i] = '\0';
+        if (i > 0 && line[i - 1] == '\r') line[--i] = '\0';
+        if (i == 0) break;
+        if (strncmp(line, "Content-Length:", 15) == 0)
+            content_length = strtol(line + 15, NULL, 10);
+    }
+    if (content_length < 0 || content_length > (1 << 24)) return NULL;
+    char *buf = malloc((size_t)content_length + 1);
+    if (!buf) return NULL;
+    size_t got = 0;
+    while (got < (size_t)content_length) {
+        size_t n = fread(buf + got, 1, (size_t)content_length - got, stdin);
+        if (n == 0) { free(buf); return NULL; }
+        got += n;
+    }
+    buf[content_length] = '\0';
+    return buf;
+}
+
 int main(void) {
     dhall_arena = arena_new();
-    bool shut_down = false;
 
     for (;;) {
         char *raw = read_frame();
         if (!raw) break;
-        Json *root = json_parse(raw, strlen(raw));
+        bool done = lsp_handle(raw, (int)strlen(raw));
+        if (g_out_len > 0) fwrite(g_out, 1, g_out_len, stdout);
+        fflush(stdout);
         free(raw);
-        if (!root) continue;
-
-        const char *method = json_str(json_obj_get(root, "method"));
-        Json *id = json_obj_get(root, "id");
-        bool is_request = id && id->type != J_NULL;
-        Json *params = json_obj_get(root, "params");
-
-        if (method && !strcmp(method, "initialize")) {
-            handle_initialize(id);
-        } else if (method && !strcmp(method, "initialized")) {
-            /* no reply */
-        } else if (method && !strcmp(method, "shutdown")) {
-            shut_down = true;
-            respond_result(id, "null");
-        } else if (method && !strcmp(method, "exit")) {
-            json_free(root);
-            return shut_down ? 0 : 1;
-        } else if (method && !strcmp(method, "textDocument/didOpen")) {
-            const Json *td = json_obj_get(params, "textDocument");
-            const char *uri = td ? json_str(json_obj_get(td, "uri")) : NULL;
-            const char *text = td ? json_str(json_obj_get(td, "text")) : NULL;
-            if (uri && text) handle_doc_change(uri, text);
-        } else if (method && !strcmp(method, "textDocument/didChange")) {
-            const Json *td = json_obj_get(params, "textDocument");
-            const char *uri = td ? json_str(json_obj_get(td, "uri")) : NULL;
-            const Json *cc = json_obj_get(params, "contentChanges");
-            const Json *last = (cc && cc->type == J_ARR && cc->as.arr.n > 0)
-                               ? json_arr_get(cc, cc->as.arr.n - 1) : NULL;
-            const char *text = last ? json_str(json_obj_get(last, "text")) : NULL;
-            if (uri && text) handle_doc_change(uri, text);
-        } else if (method && !strcmp(method, "textDocument/didClose")) {
-            const Json *td = json_obj_get(params, "textDocument");
-            const char *uri = td ? json_str(json_obj_get(td, "uri")) : NULL;
-            if (uri) { docs_remove(uri); publish_diagnostics(uri, NULL); }
-        } else if (method && !strcmp(method, "textDocument/hover")) {
-            handle_hover(id, params);
-        } else if (is_request) {
-            respond_error(id, -32601, "method not found");
-        }
-
-        json_free(root);
+        if (done) return g_shut_down ? 0 : 1;
     }
     return 0;
 }
+
+#endif /* !LSP_NO_MAIN */

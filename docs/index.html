@@ -23,6 +23,7 @@
       <nav aria-label="Primary">
         <a href="#targets">Two targets</a>
         <a href="#demo">Live demo</a>
+        <a href="#lspdemo">LSP demo</a>
         <a href="#features">Features</a>
         <a href="#examples">Examples</a>
         <a href="#benchmark">Benchmark</a>
@@ -191,6 +192,24 @@ $ node tests/wasm-smoke.js</code></pre></div>
     </div>
   </section>
 
+  <section class="section reveal" id="lspdemo">
+    <div class="wrap">
+      <p class="eyebrow">Language Server Protocol · runs in this tab</p>
+      <h2>LSP demo</h2>
+      <p class="sub">This is the <strong>real <code>dhall-lsp</code> server</strong> — the same <code>src/lsp.c</code> that powers <code>dhall-lsp.com</code> — compiled to WebAssembly. Type below to see live <code>textDocument/publishDiagnostics</code>; hover to read the inferred type from <code>textDocument/hover</code>. 100% client-side.</p>
+      <div class="demo lsp-demo">
+        <div class="window-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="window-title">dhall-lsp — in your browser</span><span class="window-badge">lsp · wasm</span></div>
+        <div class="lsp-editor-wrap">
+          <div class="lsp-highlight" id="lspHighlight" aria-hidden="true"></div>
+          <textarea id="lspSource" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="{ name = &quot;demo&quot;, port = 8080, tls = True }"></textarea>
+          <div class="lsp-tooltip" id="lspTooltip" role="tooltip" hidden></div>
+        </div>
+        <div class="lsp-foot"><span class="status" id="lspStatus">loading LSP wasm…</span><span class="lsp-type" id="lspType"></span></div>
+        <div class="lsp-diagnostics" id="lspDiagnostics"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="section reveal" id="features">
     <div class="wrap">
       <p class="eyebrow">What it does</p>
@@ -334,6 +353,8 @@ dhall to-yaml   [file|-]   <span class="term-comment"># evaluate to YAML (block 
 
   <script src="dhall.js"></script>
   <script src="app.js"></script>
+  <script src="dhall-lsp.js"></script>
+  <script src="lsp-demo.js"></script>
   <script>
     /* Progressive enhancement: scroll-reveal. Safe to drop — content is visible
      * without JS (no `.js` class) and always revealed under reduced-motion/no-IO. */
