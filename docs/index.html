@@ -25,7 +25,6 @@
       <nav aria-label="Primary">
         <a href="#targets">Two targets</a>
         <a href="#demo">Live demo</a>
-        <a href="#lspdemo">LSP demo</a>
         <a href="#features">Features</a>
         <a href="#examples">Examples</a>
         <a href="#benchmark">Benchmark</a>
@@ -150,7 +149,10 @@ $ node tests/wasm-smoke.js</code></pre></div>
       <h2>Live demo</h2>
       <p class="sub">
         Pick a mode, then edit the source. Press <kbd>Run</kbd> or <kbd>Ctrl/⌘</kbd>+<kbd>Enter</kbd>.
-        You can even paste an <code>http://…</code> import with a <code>sha256:</code> hash — the
+        The editor is a real <code>CodeMirror</code> with Dhall syntax highlighting, and the <strong>actual
+        <code>dhall-lsp</code> server</strong> (the same <code>src/lsp.c</code>, compiled to wasm) runs
+        behind it — live <code>publishDiagnostics</code> squiggles as you type, and hover shows the inferred
+        type. You can even paste an <code>http://…</code> import with a <code>sha256:</code> hash — the
         browser fetches it live (cross-origin requests need CORS headers on the target).
       </p>
 
@@ -177,8 +179,13 @@ $ node tests/wasm-smoke.js</code></pre></div>
         <div class="panes">
           <div class="pane">
             <label for="source">Dhall source</label>
-            <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"
-              placeholder="{ greeting = &quot;Hello, &quot; ++ &quot;world!&quot;, count = 1 + 2 }"></textarea>
+            <div class="lsp-editor-wrap">
+              <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"
+                placeholder="{ greeting = &quot;Hello, &quot; ++ &quot;world!&quot;, count = 1 + 2 }"></textarea>
+              <div class="lsp-tooltip" id="lspTooltip" role="tooltip" hidden></div>
+            </div>
+            <div class="lsp-foot"><span class="status" id="lspStatus">loading LSP wasm…</span><span class="lsp-type" id="lspType"></span></div>
+            <div class="lsp-diagnostics" id="lspDiagnostics"></div>
           </div>
           <div class="pane">
             <label for="output">Result</label>
@@ -190,23 +197,6 @@ $ node tests/wasm-smoke.js</code></pre></div>
           <span class="status" id="status">loading wasm…</span>
           <div class="examples" id="examplesChips" aria-label="Load an example"></div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section reveal" id="lspdemo">
-    <div class="wrap">
-      <p class="eyebrow">Language Server Protocol · runs in this tab</p>
-      <h2>LSP demo</h2>
-      <p class="sub">This is the <strong>real <code>dhall-lsp</code> server</strong> — the same <code>src/lsp.c</code> that powers <code>dhall-lsp.com</code> — compiled to WebAssembly. Type below to see live <code>textDocument/publishDiagnostics</code>; hover to read the inferred type from <code>textDocument/hover</code>. 100% client-side.</p>
-      <div class="demo lsp-demo">
-        <div class="window-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="window-title">dhall-lsp — in your browser</span><span class="window-badge">lsp · wasm</span></div>
-        <div class="lsp-editor-wrap">
-          <textarea id="lspSource" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="{ name = &quot;demo&quot;, port = 8080, tls = True }"></textarea>
-          <div class="lsp-tooltip" id="lspTooltip" role="tooltip" hidden></div>
-        </div>
-        <div class="lsp-foot"><span class="status" id="lspStatus">loading LSP wasm…</span><span class="lsp-type" id="lspType"></span></div>
-        <div class="lsp-diagnostics" id="lspDiagnostics"></div>
       </div>
     </div>
   </section>
@@ -353,13 +343,13 @@ dhall to-yaml   [file|-]   <span class="term-comment"># evaluate to YAML (block 
   </footer>
 
   <script src="dhall.js"></script>
+  <script src="vendor/codemirror.min.js?v=3"></script>
+  <script src="vendor/codemirror-simple.js?v=3"></script>
+  <script src="vendor/codemirror-lint.js?v=3"></script>
+  <script src="vendor/dhall-mode.js?v=3"></script>
   <script src="app.js"></script>
-  <script src="vendor/codemirror.min.js?v=2"></script>
-  <script src="vendor/codemirror-simple.js?v=2"></script>
-  <script src="vendor/codemirror-lint.js?v=2"></script>
-  <script src="vendor/dhall-mode.js?v=2"></script>
-  <script src="dhall-lsp.js?v=2"></script>
-  <script src="lsp-demo.js?v=2"></script>
+  <script src="dhall-lsp.js?v=3"></script>
+  <script src="lsp-demo.js?v=3"></script>
   <script>
     /* Progressive enhancement: scroll-reveal. Safe to drop — content is visible
      * without JS (no `.js` class) and always revealed under reduced-motion/no-IO. */

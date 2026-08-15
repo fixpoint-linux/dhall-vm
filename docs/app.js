@@ -1,7 +1,9 @@
 /* app.js — wires the emscripten WASM module (window.createDhall from dhall.js)
- * to the live demo. createDhall() returns a Promise resolving to the Module;
- * we expose run(mode, src) and wire up mode buttons, Run, Ctrl/⌘+Enter, and
- * the example loaders.
+ * to the live demo. The source pane is a CodeMirror 5 editor (Dhall mode,
+ * syntax highlighting). createDhall() returns a Promise resolving to the Module;
+ * we expose run(mode, src) and wire up mode buttons, Run, Ctrl/⌘+Enter, and the
+ * example loaders. lsp-demo.js attaches the wasm LSP (diagnostics + hover) to
+ * the same editor via window.__dhallEditor.
  *
  * mode: 0=typecheck 1=normalize 2=to-json 3=to-toml 4=to-yaml
  * dhall_run returns the process exit code (0 ok / 1 type / 2 parse / 3 io);
@@ -14,12 +16,24 @@
   var Module = null;
   var currentMode = 2; // to-json by default
 
-  var sourceEl = document.getElementById('source');
   var outputEl = document.getElementById('output');
   var statusEl = document.getElementById('status');
   var runBtn = document.getElementById('runBtn');
   var copyBtn = document.getElementById('copyBtn');
   var modeBtns = Array.prototype.slice.call(document.querySelectorAll('#modes .mode'));
+
+  // Build the CodeMirror editor over the #source textarea; expose it so
+  // lsp-demo.js can attach the LSP lint + hover to the SAME editor.
+  var sourceEl = document.getElementById('source');
+  var editor = CodeMirror.fromTextArea(sourceEl, {
+    mode: 'dhall',
+    theme: 'dhall',
+    lineNumbers: true,
+    indentUnit: 2,
+    tabSize: 2,
+    lineWrapping: true
+  });
+  window.__dhallEditor = editor;
 
   var DEFAULT_SRC =
     'let port = 8080\n' +
@@ -73,7 +87,7 @@
 
   function doRun() {
     if (!Module) { setStatus('WASM still loading…', true); return; }
-    var src = sourceEl.value;
+    var src = editor.getValue();
     var t0 = performance.now();
     var res;
     try {
@@ -98,7 +112,7 @@
         return r.text();
       })
       .then(function (txt) {
-        sourceEl.value = txt;
+        editor.setValue(txt);
         setMode(mode);
         doRun();
       })
@@ -172,7 +186,7 @@
   }
 
   // Boot the module, then run the default snippet.
-  sourceEl.value = DEFAULT_SRC;
+  editor.setValue(DEFAULT_SRC);
   setStatus('loading WASM…');
   createDhall()
     .then(function (M) {

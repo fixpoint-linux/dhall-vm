@@ -1,9 +1,9 @@
-/* lsp-demo.js — wires the wasm LSP server (window.createDhallLsp from dhall-lsp.js)
- * to a CodeMirror 5 editor in the 'LSP demo' section. Every change sends
- * textDocument/didChange (full sync) to the real src/lsp.c compiled to wasm; the
- * resulting textDocument/publishDiagnostics feed CodeMirror's lint addon
- * (squiggles + gutter markers + message tooltip). Hover shows the inferred type
- * from textDocument/hover. 100% client-side. */
+/* lsp-demo.js — attaches the wasm LSP server (window.createDhallLsp from
+ * dhall-lsp.js) to the CodeMirror editor created by app.js (window.__dhallEditor)
+ * in the live demo section. Every change sends textDocument/didChange (full sync)
+ * to the real src/lsp.c compiled to wasm; the resulting publishDiagnostics feed
+ * CodeMirror's lint addon (squiggles + gutter markers + message tooltip). Hover
+ * shows the inferred type from textDocument/hover. 100% client-side. */
 (function () {
   'use strict';
 
@@ -12,16 +12,17 @@
   var version = 1;
   var msgId = 0;
   var currentType = null;
-  var editor = null;
+  var editor = window.__dhallEditor;
 
   var diagEl = document.getElementById('lspDiagnostics');
   var statusEl = document.getElementById('lspStatus');
   var typeEl = document.getElementById('lspType');
   var tooltipEl = document.getElementById('lspTooltip');
 
-  var DEFAULT_SRC =
-    'let port = 8080\n' +
-    'in  { name = "demo", port = port, tls = True, tags = [ "web", "api" ] }';
+  if (!editor) {
+    if (statusEl) statusEl.textContent = 'LSP unavailable (no editor)';
+    return;
+  }
 
   /* ---- LSP bridge (mirrors the interpreter demo's dhallRun) ---- */
   function lspHandle(json) {
@@ -139,38 +140,25 @@
   }
 
   /* ---- wiring ---- */
-  function wire() {
-    editor.on('change', function () {
+  editor.setOption('lint', { async: true, getAnnotations: getAnnotations });
+
+  editor.on('change', function () {
+    updateType();
+  });
+  var hoverTimer = null;
+  editor.on('mousemove', function (cm, ev) {
+    showTooltip(ev, currentType);
+    if (hoverTimer) return;
+    hoverTimer = setTimeout(function () {
+      hoverTimer = null;
       updateType();
-    });
-    var hoverTimer = null;
-    editor.on('mousemove', function (cm, ev) {
-      showTooltip(ev, currentType);
-      if (hoverTimer) return;
-      hoverTimer = setTimeout(function () {
-        hoverTimer = null;
-        updateType();
-      }, 250);
-    });
-    editor.on('mouseleave', function () { tooltipEl.hidden = true; });
-    editor.on('mousedown', function () { tooltipEl.hidden = true; });
-  }
+    }, 250);
+  });
+  editor.on('mouseleave', function () { tooltipEl.hidden = true; });
+  editor.on('mousedown', function () { tooltipEl.hidden = true; });
 
   /* ---- boot ---- */
   statusEl.textContent = 'loading LSP wasm…';
-  var srcEl = document.getElementById('lspSource');
-  editor = CodeMirror.fromTextArea(srcEl, {
-    mode: 'dhall',
-    theme: 'dhall',
-    lineNumbers: true,
-    indentUnit: 2,
-    tabSize: 2,
-    lineWrapping: true,
-    lint: { async: true, getAnnotations: getAnnotations }
-  });
-  editor.setValue(DEFAULT_SRC);
-  wire();
-
   createDhallLsp()
     .then(function (M) {
       Module = M;

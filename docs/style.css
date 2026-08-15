@@ -379,9 +379,9 @@ pre code { background: none; border: none; padding: 0; color: #d8dde6; font-size
   border-bottom: 1px solid var(--border-soft);
 }
 /* CodeMirror fills the wrap; the hidden textarea is just CM's backing field. */
-#lspSource { display: none; }
+.lsp-editor-wrap textarea { display: none; }
 .lsp-editor-wrap .CodeMirror {
-  height: 300px; font-family: var(--mono); font-size: 0.88rem; line-height: 1.55;
+  height: 320px; font-family: var(--mono); font-size: 0.88rem; line-height: 1.55;
   background: #0d1119; color: var(--text); border: none;
 }
 .lsp-editor-wrap .CodeMirror-gutters {
@@ -400,10 +400,12 @@ pre code { background: none; border: none; padding: 0; color: #d8dde6; font-size
 }
 .lsp-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 11px 16px; border-top: 1px solid var(--border); flex-wrap: wrap;
+  padding: 8px 14px; border-top: 1px solid var(--border); background: #0d1119;
+  flex-wrap: wrap; font-size: 0.8rem;
 }
 .lsp-type { color: var(--accent-2); font-family: var(--mono); font-size: 0.8rem; }
-.lsp-diagnostics { border-top: 1px solid var(--border-soft); padding: 10px 16px; min-height: 24px; font-family: var(--mono); font-size: 0.8rem; }
+.lsp-diagnostics { background: #0d1119; border-top: 1px solid var(--border-soft); padding: 8px 14px; min-height: 24px; font-family: var(--mono); font-size: 0.8rem; }
+.lsp-diagnostics .lsp-diag { margin: 2px 0; }
 .lsp-diag.err { color: var(--error); margin: 2px 0; }
 .lsp-diag.ok { color: var(--green); }
 
