@@ -376,25 +376,22 @@ pre code { background: none; border: none; padding: 0; color: #d8dde6; font-size
 .lsp-demo .window-bar { padding: 11px 14px; border-bottom: 1px solid var(--border-soft); }
 .lsp-editor-wrap {
   position: relative; overflow: hidden; background: #0d1119;
+  border-bottom: 1px solid var(--border-soft);
 }
-.lsp-highlight {
-  position: absolute; inset: 0; overflow: auto; pointer-events: none;
-  font-family: var(--mono); font-size: 0.88rem; line-height: 1.55;
-  padding: 13px; box-sizing: border-box; color: var(--text);
-  white-space: pre-wrap; word-wrap: break-word;
+/* CodeMirror fills the wrap; the hidden textarea is just CM's backing field. */
+#lspSource { display: none; }
+.lsp-editor-wrap .CodeMirror {
+  height: 300px; font-family: var(--mono); font-size: 0.88rem; line-height: 1.55;
+  background: #0d1119; color: var(--text); border: none;
 }
-.lsp-highlight .err {
-  text-decoration: underline wavy var(--error) 1px; text-underline-offset: 3px;
-  background: rgba(248, 113, 113, 0.12); border-radius: 2px;
+.lsp-editor-wrap .CodeMirror-gutters {
+  background: #0d1119; border-right: 1px solid var(--border-soft); color: #3a4660;
 }
-#lspSource {
-  position: relative; display: block; width: 100%; height: 300px; resize: none;
-  background: transparent; color: transparent; caret-color: var(--accent);
-  border: none; border-radius: 0; font-size: 0.88rem; line-height: 1.55;
-  padding: 13px; box-sizing: border-box; white-space: pre-wrap; word-wrap: break-word;
-}
-#lspSource:focus { box-shadow: none; }
-#lspSource::placeholder { color: #3a4660; }
+.lsp-editor-wrap .CodeMirror-linenumber { color: #3a4660; padding: 0 8px 0 12px; }
+.lsp-editor-wrap .CodeMirror-cursor { border-left: 2px solid var(--accent); }
+.lsp-editor-wrap .CodeMirror-selected { background: rgba(240, 180, 41, 0.14); }
+.lsp-editor-wrap .CodeMirror-focused .CodeMirror-selected { background: rgba(240, 180, 41, 0.2); }
+.lsp-editor-wrap .CodeMirror-activeline-background { background: rgba(255, 255, 255, 0.03); }
 .lsp-tooltip {
   position: absolute; z-index: 5; max-width: 480px;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
@@ -410,13 +407,32 @@ pre code { background: none; border: none; padding: 0; color: #d8dde6; font-size
 .lsp-diag.err { color: var(--error); margin: 2px 0; }
 .lsp-diag.ok { color: var(--green); }
 
-/* ---- syntax highlighting (LSP demo) ---- */
-.lsp-highlight .tk-kw     { color: #f0b429; font-weight: 600; }          /* let/in/if/else */
-.lsp-highlight .tk-type   { color: #a78bfa; font-weight: 600; }          /* Natural/Text/List */
-.lsp-highlight .tk-bool   { color: #22d3ee; }                            /* True/False */
-.lsp-highlight .tk-builtin{ color: #22d3ee; }                            /* List/map & co */
-.lsp-highlight .tk-str    { color: #34d399; }                            /* "strings" */
-.lsp-highlight .tk-num    { color: #fca5a5; }                            /* 123 / 1.5 */
-.lsp-highlight .tk-com    { color: #5b6476; font-style: italic; }        /* -- {- -} */
-.lsp-highlight .tk-op     { color: #94a3b8; }                            /* operators */
-.lsp-highlight .tk-var    { color: var(--text); }
+/* ---- syntax highlighting (CodeMirror cm-s-dhall theme) ---- */
+.lsp-editor-wrap .CodeMirror { color: var(--text); }
+.lsp-editor-wrap .cm-s-dhall .cm-keyword    { color: #f0b429; font-weight: 600; }  /* let/in/if/else */
+.lsp-editor-wrap .cm-s-dhall .cm-type       { color: #a78bfa; font-weight: 600; }  /* Natural/Text/List */
+.lsp-editor-wrap .cm-s-dhall .cm-atom       { color: #22d3ee; }                    /* True/False */
+.lsp-editor-wrap .cm-s-dhall .cm-builtin    { color: #22d3ee; }                    /* List/map & co */
+.lsp-editor-wrap .cm-s-dhall .cm-string     { color: #34d399; }                    /* "strings" */
+.lsp-editor-wrap .cm-s-dhall .cm-number     { color: #fca5a5; }                    /* 123 / 1.5 */
+.lsp-editor-wrap .cm-s-dhall .cm-comment    { color: #5b6476; font-style: italic; }/* -- {- -} */
+.lsp-editor-wrap .cm-s-dhall .cm-operator   { color: #94a3b8; }                    /* operators */
+.lsp-editor-wrap .cm-s-dhall .cm-variable   { color: var(--text); }
+
+/* ---- LSP diagnostics: lint squiggle + gutter + tooltip (dark theme) ---- */
+.lsp-editor-wrap .CodeMirror-lint-mark-error {
+  background-image: none; background: none;
+  text-decoration: underline wavy var(--error) 1px; text-underline-offset: 3px;
+}
+.lsp-editor-wrap .CodeMirror-lint-line-error { background-color: rgba(248, 113, 113, 0.08); }
+.lsp-editor-wrap .CodeMirror-lint-tooltip {
+  background-color: var(--panel-2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 0.78rem;
+  box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.9);
+}
+.lsp-editor-wrap .CodeMirror-lint-markers { width: 16px; }
+.lsp-editor-wrap .CodeMirror-lint-marker-error {
+  background-image: none;
+  border-radius: 3px; width: 14px; height: 14px; margin-top: 3px;
+  background: linear-gradient(135deg, var(--error), #b91c1c);
+}

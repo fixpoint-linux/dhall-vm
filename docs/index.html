@@ -10,6 +10,8 @@
   <meta property="og:description" content="One C source, two targets: a single native APE binary for every major OS, and a WebAssembly build that runs in your browser.">
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="vendor/codemirror.css">
+  <link rel="stylesheet" href="vendor/codemirror-lint.css">
   <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
@@ -200,7 +202,6 @@ $ node tests/wasm-smoke.js</code></pre></div>
       <div class="demo lsp-demo">
         <div class="window-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="window-title">dhall-lsp — in your browser</span><span class="window-badge">lsp · wasm</span></div>
         <div class="lsp-editor-wrap">
-          <div class="lsp-highlight" id="lspHighlight" aria-hidden="true"></div>
           <textarea id="lspSource" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="{ name = &quot;demo&quot;, port = 8080, tls = True }"></textarea>
           <div class="lsp-tooltip" id="lspTooltip" role="tooltip" hidden></div>
         </div>
@@ -353,6 +354,10 @@ dhall to-yaml   [file|-]   <span class="term-comment"># evaluate to YAML (block 
 
   <script src="dhall.js"></script>
   <script src="app.js"></script>
+  <script src="vendor/codemirror.min.js"></script>
+  <script src="vendor/codemirror-simple.js"></script>
+  <script src="vendor/codemirror-lint.js"></script>
+  <script src="vendor/dhall-mode.js"></script>
   <script src="dhall-lsp.js"></script>
   <script src="lsp-demo.js"></script>
   <script>

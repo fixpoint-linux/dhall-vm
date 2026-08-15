@@ -1,8 +1,9 @@
 /* lsp-demo.js — wires the wasm LSP server (window.createDhallLsp from dhall-lsp.js)
- * to the interactive 'LSP demo' section. We send initialize / didOpen / didChange
- * (full sync) / textDocument/hover and parse the Content-Length-framed
- * publishDiagnostics + hover responses. The server is the REAL src/lsp.c
- * compiled to wasm (lsp_handle / lsp_out / lsp_out_len). */
+ * to a CodeMirror 5 editor in the 'LSP demo' section. Every change sends
+ * textDocument/didChange (full sync) to the real src/lsp.c compiled to wasm; the
+ * resulting textDocument/publishDiagnostics feed CodeMirror's lint addon
+ * (squiggles + gutter markers + message tooltip). Hover shows the inferred type
+ * from textDocument/hover. 100% client-side. */
 (function () {
   'use strict';
 
@@ -11,9 +12,8 @@
   var version = 1;
   var msgId = 0;
   var currentType = null;
+  var editor = null;
 
-  var sourceEl = document.getElementById('lspSource');
-  var highlightEl = document.getElementById('lspHighlight');
   var diagEl = document.getElementById('lspDiagnostics');
   var statusEl = document.getElementById('lspStatus');
   var typeEl = document.getElementById('lspType');
@@ -22,15 +22,6 @@
   var DEFAULT_SRC =
     'let port = 8080\n' +
     'in  { name = "demo", port = port, tls = True, tags = [ "web", "api" ] }';
-
-  function esc(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-  /* Attribute-safe variant: also neutralises quotes so diagnostic messages
-     (which can echo pasted source) can't break out of a title="..." attribute. */
-  function escAttr(s) {
-    return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
 
   /* ---- LSP bridge (mirrors the interpreter demo's dhallRun) ---- */
   function lspHandle(json) {
@@ -65,10 +56,9 @@
     return parseFrames(lspHandle(JSON.stringify(o))).map(JSON.parse);
   }
 
-  /* ---- rendering ---- */
+  /* ---- diagnostics list under the editor ---- */
   function renderDiagnostics(diags) {
     diagEl.innerHTML = '';
-    typeEl.textContent = currentType ? ('type : ' + currentType) : '';
     if (!diags.length) {
       var ok = document.createElement('div');
       ok.className = 'lsp-diag ok';
@@ -85,131 +75,47 @@
     });
   }
 
-  function renderHighlight(text, diags) {
-    var lines = text.split('\n');
-    var marks = {}; // line -> { col -> message }
-    diags.forEach(function (d) {
-      var l = d.range.start.line, c = d.range.start.character;
-      if (l < 0 || l >= lines.length) return;
-      (marks[l] = marks[l] || {})[c] = d.message;
-    });
-    var html = lines.map(function (line, li) {
-      var cls = tokenizeLine(line);          // per-char syntax class array
-      var m = marks[li];
-      var out = '', c = 0, n = line.length;
-      while (c < n) {
-        if (m && m[c]) {
-          out += '<span class="err" title="' + escAttr(m[c]) + '">' + esc(line.charAt(c)) + '</span>';
-          c++;
-          continue;
-        }
-        var k = cls[c] || 'tk-var';
-        var j = c;
-        while (j < n && !(m && m[j]) && (cls[j] || 'tk-var') === k) j++;
-        out += '<span class="' + k + '">' + esc(line.slice(c, j)) + '</span>';
-        c = j;
-      }
-      // A diagnostic can point one past the end of the line (e.g. a missing
-      // '}' that closes a record); render that as a trailing-space squiggle.
-      if (m && m[n] !== undefined) {
-        out += '<span class="err" title="' + escAttr(m[n]) + '"> </span>';
-      }
-      return out + (li < lines.length - 1 ? '\n' : '');
-    }).join('');
-    highlightEl.innerHTML = html;
-  }
-
-  /* ---- lightweight Dhall syntax highlighter ----
-     Tokenizes a single line into (start, end, class) segments covering every
-     column, so the error-squiggle overlay (which marks single columns) layers on
-     top cleanly. Handles the Dhall subset: -- / {- -} comments, "strings" (with
-     \escapes), integers/doubles, let/if/etc keywords, builtin types, List/map
-     style builtins, and the Unicode + ASCII operators. */
-  var KW = /^(let|in|if|then|else|merge|assert|as|with|using|missing|forall)$/;
-  var TYPES = /^(Natural|Integer|Double|Text|Bool|List|Optional|Type|Kind)$/;
-  var OPS2 = /^(->|\/\=|\=\=|\!\=|<=|>=|&&|\|\||\/\/|\/\=|∨|∧|≡|⫽|→|∀|λ)$/;
-
-  function tokenizeLine(line) {
-    var cls = new Array(line.length).fill('tk-var');
-    var i = 0, n = line.length;
-    function paint(a, b, k) { for (var x = a; x < b && x < n; x++) cls[x] = k; }
-    while (i < n) {
-      var ch = line[i];
-      // line comment --
-      if (line.startsWith('--', i)) { paint(i, n, 'tk-com'); break; }
-      // block comment {- ... -}
-      if (line.startsWith('{-', i)) {
-        var e = line.indexOf('-}', i + 2);
-        paint(i, e < 0 ? n : e + 2, 'tk-com');
-        i = e < 0 ? n : e + 2;
-        continue;
-      }
-      // string "..." with \escapes
-      if (ch === '"') {
-        var j = i + 1;
-        while (j < n) {
-          if (line[j] === '\\') { j += 2; continue; }
-          if (line[j] === '"') { j++; break; }
-          j++;
-        }
-        paint(i, j, 'tk-str');
-        i = j;
-        continue;
-      }
-      // number (optional leading -)
-      if (/[0-9]/.test(ch) || (ch === '-' && /[0-9]/.test(line[i + 1] || ''))) {
-        var j = i + (ch === '-' ? 1 : 0);
-        while (j < n && /[0-9]/.test(line[j])) j++;
-        if (line[j] === '.') { j++; while (j < n && /[0-9]/.test(line[j])) j++; }
-        paint(i, j, 'tk-num');
-        i = j;
-        continue;
-      }
-      // identifier (optionally List/map style with a slash)
-      if (/[A-Za-z_]/.test(ch)) {
-        var j = i;
-        while (j < n && /[A-Za-z0-9_]/.test(line[j])) j++;
-        if (line[j] === '/' && /[A-Za-z_]/.test(line[j + 1] || '')) {
-          j++;
-          while (j < n && /[A-Za-z0-9_]/.test(line[j])) j++;
-        }
-        var w = line.slice(i, j);
-        var k = KW.test(w) ? 'tk-kw'
-              : TYPES.test(w) ? 'tk-type'
-              : /^(True|False)$/.test(w) ? 'tk-bool'
-              : w.indexOf('/') > 0 ? 'tk-builtin'
-              : 'tk-var';
-        paint(i, j, k);
-        i = j;
-        continue;
-      }
-      // operators (multi-char first)
-      var two = line.slice(i, i + 2);
-      if (OPS2.test(two)) { paint(i, i + 2, 'tk-op'); i += 2; continue; }
-      if (/[+\-*/=:<>,.!?\\]/.test(ch) || /[\u2192\u2200\u2227\u2228\u2261\u2afd\u2a3e\u03bb]/.test(ch)) {
-        paint(i, i + 1, 'tk-op'); i += 1; continue;
-      }
-      i += 1; // whitespace / brackets / other (left uncolored)
-    }
-    return cls;
-  }
-
-  function refresh() {
+  /* ---- CodeMirror lint: drive didChange, return LSP diagnostics ----
+     This is the getAnnotations callback CM calls on every change / lint()
+     pass. It sends didChange (full sync), reads publishDiagnostics, renders
+     the footer list, and returns CM lint annotations. */
+  function getAnnotations(cm, updateLinting) {
+    if (!Module) { updateLinting([]); return; }
+    version++;
     var frames = send('textDocument/didChange', {
       textDocument: { uri: URI, version: version },
-      contentChanges: [{ text: sourceEl.value }]
+      contentChanges: [{ text: cm.getValue() }]
     });
     var all = [].concat.apply([], frames
       .filter(function (f) { return f.method === 'textDocument/publishDiagnostics'; })
       .map(function (f) { return f.params.diagnostics || []; }));
-    renderHighlight(sourceEl.value, all);
     renderDiagnostics(all);
+    var annotations = all.map(function (d) {
+      var r = d.range;
+      var from = cm.Pos(r.start.line, r.start.character);
+      // diagnostics are zero-width points; extend by one char so the squiggle
+      // is visible, clamped to the line length.
+      var toLine = r.end.line;
+      var toCh = r.end.character;
+      var lineLen = cm.getLine(toLine) ? cm.getLine(toLine).length : 0;
+      if (toCh >= lineLen) toCh = Math.max(lineLen, toCh + 1);
+      else toCh++;
+      return {
+        from: from,
+        to: cm.Pos(toLine, toCh),
+        message: d.message,
+        severity: 'error'
+      };
+    });
+    updateLinting(annotations);
   }
 
-  function hover() {
+  /* ---- hover: refresh the whole-doc type (server returns the doc type) ---- */
+  function updateType() {
+    if (!Module) return;
     var frames = send('textDocument/hover', {
       textDocument: { uri: URI },
-      position: { line: 0, character: 0 } // server returns the whole-doc type
+      position: { line: 0, character: 0 }
     }, ++msgId);
     var r = frames.find(function (f) { return f.id === msgId; });
     if (r && r.result && r.result.contents) {
@@ -219,44 +125,51 @@
       currentType = null;
       typeEl.textContent = '';
     }
-    return currentType;
   }
 
+  /* ---- hover tooltip (type under the cursor) ---- */
   function showTooltip(ev, text) {
     if (!text) { tooltipEl.hidden = true; return; }
     tooltipEl.textContent = text;
     tooltipEl.hidden = false;
-    var wrap = sourceEl.parentNode.getBoundingClientRect();
+    var wrap = editor.getWrapperElement().getBoundingClientRect();
     tooltipEl.style.left = (ev.clientX - wrap.left + 12) + 'px';
     tooltipEl.style.top = (ev.clientY - wrap.top - 12) + 'px';
   }
 
   /* ---- wiring ---- */
-  sourceEl.addEventListener('input', function () {
-    version++;
-    refresh();
-    hover();
-  });
-
-  var hoverTimer = null;
-  sourceEl.addEventListener('mousemove', function (ev) {
-    showTooltip(ev, currentType);
-    if (hoverTimer) return;
-    hoverTimer = setTimeout(function () {
-      hoverTimer = null;
-      hover();
-    }, 200);
-  });
-  sourceEl.addEventListener('mouseleave', function () { tooltipEl.hidden = true; });
-
-  sourceEl.addEventListener('scroll', function () {
-    highlightEl.scrollTop = sourceEl.scrollTop;
-    highlightEl.scrollLeft = sourceEl.scrollLeft;
-  });
+  function wire() {
+    editor.on('change', function () {
+      updateType();
+    });
+    var hoverTimer = null;
+    editor.on('mousemove', function (cm, ev) {
+      showTooltip(ev, currentType);
+      if (hoverTimer) return;
+      hoverTimer = setTimeout(function () {
+        hoverTimer = null;
+        updateType();
+      }, 250);
+    });
+    editor.on('mouseleave', function () { tooltipEl.hidden = true; });
+    editor.on('mousedown', function () { tooltipEl.hidden = true; });
+  }
 
   /* ---- boot ---- */
-  sourceEl.value = DEFAULT_SRC;
   statusEl.textContent = 'loading LSP wasm…';
+  var srcEl = document.getElementById('lspSource');
+  editor = CodeMirror.fromTextArea(srcEl, {
+    mode: 'dhall',
+    theme: 'dhall',
+    lineNumbers: true,
+    indentUnit: 2,
+    tabSize: 2,
+    lineWrapping: true,
+    lint: { async: true, getAnnotations: getAnnotations }
+  });
+  editor.setValue(DEFAULT_SRC);
+  wire();
+
   createDhallLsp()
     .then(function (M) {
       Module = M;
@@ -269,10 +182,10 @@
       }
       statusEl.textContent = 'LSP ready';
       send('textDocument/didOpen', {
-        textDocument: { uri: URI, languageId: 'dhall', version: version, text: sourceEl.value }
+        textDocument: { uri: URI, languageId: 'dhall', version: version, text: editor.getValue() }
       });
-      refresh();
-      hover();
+      editor.performLint();
+      updateType();
     })
     .catch(function (e) {
       statusEl.textContent = 'LSP wasm failed to load: ' + e.message;
