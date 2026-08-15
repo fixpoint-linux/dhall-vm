@@ -109,11 +109,10 @@ bidirectional typechecking) includes:
   `Natural/fold`, `Natural/build`, `Natural/even`, `Natural/odd`, `Natural/toInteger`,
   `Integer/toDouble`, `Integer/negate`, `Integer/show`, `Integer/clamp`,
   `Double/show`, `Text/show`, `Text/replace`.
-- **Assertions** — `assert : body` where `body : Bool` and normalizes to
-  `True`. Note: the assertion is enforced during `typecheck`; the
-  `normalize` and serializer (`to-json`/`to-toml`/`to-yaml`) modes do not
-  typecheck first, so `assert : False` there evaluates to `true` without an
-  error (always typecheck first to rely on the guarantee).
+- **Assertions** — `assert : body` where `body : Bool` normalizes to `True`.
+  The assertion is **enforced in every mode**: `typecheck`, `normalize`, and the
+  serializers (`to-json`/`to-toml`/`to-yaml`) all reject `assert : False`
+  (or a stuck, non-`True` body) with `assertion did not hold`.
 - **Serializers** — one evaluated value tree renders the same expression to
   **JSON**, **TOML** (top level must be a record), or **YAML** (block style, 1.2
   core schema), reusing a single shared value representation.
