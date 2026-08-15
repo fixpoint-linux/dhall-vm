@@ -10,6 +10,7 @@
 
 typedef struct {
     Term **types;
+    Term **vals;
     const char **names;
     int n, cap;
 } Ctx;
@@ -18,15 +19,18 @@ static void ctx_init(Ctx *g) {
     g->cap = 64;
     g->n = 0;
     g->types = malloc(g->cap * sizeof(Term *));
+    g->vals = malloc(g->cap * sizeof(Term *));
     g->names = malloc(g->cap * sizeof(char *));
 }
-static void ctx_push(Ctx *g, Term *ty, const char *name) {
+static void ctx_push(Ctx *g, Term *ty, const char *name, Term *val) {
     if (g->n == g->cap) {
         g->cap *= 2;
         g->types = realloc(g->types, g->cap * sizeof(Term *));
+        g->vals = realloc(g->vals, g->cap * sizeof(Term *));
         g->names = realloc(g->names, g->cap * sizeof(char *));
     }
     g->types[g->n] = ty;
+    g->vals[g->n] = val;
     g->names[g->n] = name;
     g->n++;
 }
@@ -44,6 +48,7 @@ static const char *ctx_name(Ctx *g, int idx) {
 
 static Term *infer(Ctx *g, Term *t, DhallError *err);
 static bool check(Ctx *g, Term *t, Term *ty, DhallError *err);
+static Term *resolve_type(Ctx *g, Term *ty, int depth);
 
 static bool is_sort(Term *t) {
     return t->tag == TmType || t->tag == TmKind || t->tag == TmSort;
@@ -259,7 +264,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
             err_here(err, ERR_TYPE, t, "unbound variable '%s'", ctx_name(g, t->as.idx));
             return NULL;
         }
-        return ty;
+        return resolve_type(g, ty, 0);
     }
     case TmConst:
         switch (t->as.c.kind) {
@@ -294,7 +299,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
         Term *d = infer(g, t->as.pi.dom, err);
         if (!d) return NULL;
         if (!is_sort(normalize(d))) { err_here(err, ERR_TYPE, t, "Pi domain is not a type/sort"); return NULL; }
-        ctx_push(g, t->as.pi.dom, "_");
+        ctx_push(g, t->as.pi.dom, "_", NULL);
         Term *c = infer(g, t->as.pi.cod, err);
         ctx_pop(g);
         if (!c) return NULL;
@@ -324,7 +329,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
             valTy = infer(g, t->as.let_.val, err);
             if (!valTy) return NULL;
         }
-        ctx_push(g, valTy, "x");
+        ctx_push(g, valTy, "x", t->as.let_.val);
         Term *r = infer(g, t->as.let_.body, err);
         ctx_pop(g);
         return r;
@@ -334,12 +339,12 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
         if (!tty) return NULL;
         if (!is_sort(normalize(tty))) { err_here(err, ERR_TYPE, t, "annotation is not a type"); return NULL; }
         if (!check(g, t->as.ann.e, t->as.ann.ty, err)) return NULL;
-        return t->as.ann.ty;
+        return resolve_type(g, t->as.ann.ty, 0);
     }
     case TmLam: {
         /* only inferable when a domain annotation is present */
         if (!t->as.lam.dom) { err_here(err, ERR_TYPE, t, "cannot infer type of lambda (needs annotation)"); return NULL; }
-        ctx_push(g, t->as.lam.dom, "_");
+        ctx_push(g, t->as.lam.dom, "_", NULL);
         Term *cod = infer(g, t->as.lam.body, err);
         ctx_pop(g);
         if (!cod) return NULL;
@@ -581,14 +586,54 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
     }
 }
 
+static Term *resolve_type(Ctx *g, Term *ty, int depth) {
+    switch (ty->tag) {
+    case TmVar: {
+        int idx = ty->as.idx;
+        if (idx >= depth) {
+            int pos = g->n - 1 - (idx - depth);
+            if (pos >= 0 && pos < g->n && g->vals[pos])
+                return resolve_type(g, shift(idx - depth + 1, 0, g->vals[pos]), 0);
+        }
+        return ty;
+    }
+    case TmLam:
+        return tm_lam(resolve_type(g, ty->as.lam.dom, depth), resolve_type(g, ty->as.lam.body, depth + 1));
+    case TmPi:
+        return tm_pi(resolve_type(g, ty->as.pi.dom, depth), resolve_type(g, ty->as.pi.cod, depth + 1));
+    case TmApp:
+        return tm_app(resolve_type(g, ty->as.app.fn, depth), resolve_type(g, ty->as.app.arg, depth));
+    case TmRecordType: {
+        Field *fs = arena_alloc(dhall_arena, ty->as.rec.n * sizeof(Field));
+        for (int i = 0; i < ty->as.rec.n; i++) {
+            fs[i].label = ty->as.rec.fs[i].label;
+            fs[i].type = ty->as.rec.fs[i].type ? resolve_type(g, ty->as.rec.fs[i].type, depth) : NULL;
+            fs[i].value = NULL;
+        }
+        return tm_record_type(fs, ty->as.rec.n);
+    }
+    case TmUnionType: {
+        Field *fs = arena_alloc(dhall_arena, ty->as.uni.n * sizeof(Field));
+        for (int i = 0; i < ty->as.uni.n; i++) {
+            fs[i].label = ty->as.uni.fs[i].label;
+            fs[i].type = ty->as.uni.fs[i].type ? resolve_type(g, ty->as.uni.fs[i].type, depth) : NULL;
+            fs[i].value = NULL;
+        }
+        return tm_union_type(fs, ty->as.uni.n);
+    }
+    default:
+        return ty;
+    }
+}
+
 static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
-    Term *nty = normalize(ty);
+    Term *nty = normalize(resolve_type(g, ty, 0));
     if (t->tag == TmLam && nty->tag == TmPi) {
-        if (!alpha_eq(normalize(t->as.lam.dom), normalize(nty->as.pi.dom))) {
+        if (!alpha_eq(normalize(resolve_type(g, t->as.lam.dom, 0)), normalize(nty->as.pi.dom))) {
             err_here(err, ERR_TYPE, t, "lambda domain annotation mismatch");
             return false;
         }
-        ctx_push(g, nty->as.pi.dom, "_");
+        ctx_push(g, nty->as.pi.dom, "_", NULL);
         bool ok = check(g, t->as.lam.body, nty->as.pi.cod, err);
         ctx_pop(g);
         return ok;
@@ -600,7 +645,7 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
     if (t->tag == TmSome && is_optional_type(nty))
         return check(g, t->as.some.val, nty->as.app.arg, err);
     if (t->tag == TmNone && is_optional_type(nty)) {
-        if (!alpha_eq(normalize(t->as.none.ty), normalize(nty->as.app.arg))) {
+        if (!alpha_eq(normalize(resolve_type(g, t->as.none.ty, 0)), normalize(nty->as.app.arg))) {
             err_here(err, ERR_TYPE, t, "None type argument mismatch");
             return false;
         }
@@ -617,6 +662,28 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
         for (int i = 0; i < t->as.rec.n; i++)
             if (!check(g, t->as.rec.fs[i].value, nty->as.rec.fs[i].type, err))
                 return false;
+        return true;
+    }
+    if (t->tag == TmUnionLit && nty->tag == TmUnionType) {
+        for (int i = 0; i < t->as.uni.n; i++) {
+            const char *label = t->as.uni.fs[i].label;
+            int j = -1;
+            for (int k = 0; k < nty->as.uni.n; k++)
+                if (!strcmp(nty->as.uni.fs[k].label, label)) { j = k; break; }
+            if (j < 0) {
+                err_here(err, ERR_TYPE, t, "union literal alternative '%s' is not in the union type", label);
+                return false;
+            }
+            Term *declTy = nty->as.uni.fs[j].type;
+            Term *val = t->as.uni.fs[i].value;
+            if (val) {
+                if (!declTy) {
+                    err_here(err, ERR_TYPE, t, "union alternative '%s' carries no value (no declared type)", label);
+                    return false;
+                }
+                if (!check(g, val, declTy, err)) return false;
+            }
+        }
         return true;
     }
     if (t->tag == TmText && nty->tag == TmBuiltin && !strcmp(nty->as.bname, "Text")) {
@@ -662,6 +729,7 @@ Term *infer_type(Parser *p, Term *t, DhallError *err) {
     ctx_init(&g);
     Term *r = infer(&g, t, err);
     free(g.types);
+    free(g.vals);
     free(g.names);
     if (normalize_has_error()) {
         *err = *normalize_get_error();
