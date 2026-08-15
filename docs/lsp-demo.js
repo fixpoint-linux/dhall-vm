@@ -76,15 +76,16 @@
   }
 
   /* ---- CodeMirror lint: drive didChange, return LSP diagnostics ----
-     This is the getAnnotations callback CM calls on every change / lint()
-     pass. It sends didChange (full sync), reads publishDiagnostics, renders
-     the footer list, and returns CM lint annotations. */
-  function getAnnotations(cm, updateLinting) {
+     CM's lint addon calls getAnnotations(text, updateLinting, options, cm):
+     the first arg is the editor's current text string; the CodeMirror instance
+     is the 4th arg. We send didChange (full sync), read publishDiagnostics,
+     render the footer list, and feed CM's lint annotations. */
+  function getAnnotations(text, updateLinting, options, cm) {
     if (!Module) { updateLinting([]); return; }
     version++;
     var frames = send('textDocument/didChange', {
       textDocument: { uri: URI, version: version },
-      contentChanges: [{ text: cm.getValue() }]
+      contentChanges: [{ text: text }]
     });
     var all = [].concat.apply([], frames
       .filter(function (f) { return f.method === 'textDocument/publishDiagnostics'; })
