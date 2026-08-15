@@ -94,21 +94,104 @@
       (marks[l] = marks[l] || {})[c] = d.message;
     });
     var html = lines.map(function (line, li) {
+      var cls = tokenizeLine(line);          // per-char syntax class array
       var m = marks[li];
-      if (!m) return esc(line) + (li < lines.length - 1 ? '\n' : '');
-      var cols = Object.keys(m).map(Number).sort(function (a, b) { return a - b; });
-      var out = '', i = 0;
-      cols.forEach(function (c) {
-        if (c < 0) c = 0;
-        if (c > line.length) c = line.length;
-        if (c > i) out += esc(line.slice(i, c));
-        out += '<span class="err" title="' + escAttr(m[c]) + '">' + esc(line.charAt(c) || ' ') + '</span>';
-        i = c + 1;
-      });
-      out += esc(line.slice(i));
+      var out = '', c = 0, n = line.length;
+      while (c < n) {
+        if (m && m[c]) {
+          out += '<span class="err" title="' + escAttr(m[c]) + '">' + esc(line.charAt(c)) + '</span>';
+          c++;
+          continue;
+        }
+        var k = cls[c] || 'tk-var';
+        var j = c;
+        while (j < n && !(m && m[j]) && (cls[j] || 'tk-var') === k) j++;
+        out += '<span class="' + k + '">' + esc(line.slice(c, j)) + '</span>';
+        c = j;
+      }
+      // A diagnostic can point one past the end of the line (e.g. a missing
+      // '}' that closes a record); render that as a trailing-space squiggle.
+      if (m && m[n] !== undefined) {
+        out += '<span class="err" title="' + escAttr(m[n]) + '"> </span>';
+      }
       return out + (li < lines.length - 1 ? '\n' : '');
     }).join('');
     highlightEl.innerHTML = html;
+  }
+
+  /* ---- lightweight Dhall syntax highlighter ----
+     Tokenizes a single line into (start, end, class) segments covering every
+     column, so the error-squiggle overlay (which marks single columns) layers on
+     top cleanly. Handles the Dhall subset: -- / {- -} comments, "strings" (with
+     \escapes), integers/doubles, let/if/etc keywords, builtin types, List/map
+     style builtins, and the Unicode + ASCII operators. */
+  var KW = /^(let|in|if|then|else|merge|assert|as|with|using|missing|forall)$/;
+  var TYPES = /^(Natural|Integer|Double|Text|Bool|List|Optional|Type|Kind)$/;
+  var OPS2 = /^(->|\/\=|\=\=|\!\=|<=|>=|&&|\|\||\/\/|\/\=|∨|∧|≡|⫽|→|∀|λ)$/;
+
+  function tokenizeLine(line) {
+    var cls = new Array(line.length).fill('tk-var');
+    var i = 0, n = line.length;
+    function paint(a, b, k) { for (var x = a; x < b && x < n; x++) cls[x] = k; }
+    while (i < n) {
+      var ch = line[i];
+      // line comment --
+      if (line.startsWith('--', i)) { paint(i, n, 'tk-com'); break; }
+      // block comment {- ... -}
+      if (line.startsWith('{-', i)) {
+        var e = line.indexOf('-}', i + 2);
+        paint(i, e < 0 ? n : e + 2, 'tk-com');
+        i = e < 0 ? n : e + 2;
+        continue;
+      }
+      // string "..." with \escapes
+      if (ch === '"') {
+        var j = i + 1;
+        while (j < n) {
+          if (line[j] === '\\') { j += 2; continue; }
+          if (line[j] === '"') { j++; break; }
+          j++;
+        }
+        paint(i, j, 'tk-str');
+        i = j;
+        continue;
+      }
+      // number (optional leading -)
+      if (/[0-9]/.test(ch) || (ch === '-' && /[0-9]/.test(line[i + 1] || ''))) {
+        var j = i + (ch === '-' ? 1 : 0);
+        while (j < n && /[0-9]/.test(line[j])) j++;
+        if (line[j] === '.') { j++; while (j < n && /[0-9]/.test(line[j])) j++; }
+        paint(i, j, 'tk-num');
+        i = j;
+        continue;
+      }
+      // identifier (optionally List/map style with a slash)
+      if (/[A-Za-z_]/.test(ch)) {
+        var j = i;
+        while (j < n && /[A-Za-z0-9_]/.test(line[j])) j++;
+        if (line[j] === '/' && /[A-Za-z_]/.test(line[j + 1] || '')) {
+          j++;
+          while (j < n && /[A-Za-z0-9_]/.test(line[j])) j++;
+        }
+        var w = line.slice(i, j);
+        var k = KW.test(w) ? 'tk-kw'
+              : TYPES.test(w) ? 'tk-type'
+              : /^(True|False)$/.test(w) ? 'tk-bool'
+              : w.indexOf('/') > 0 ? 'tk-builtin'
+              : 'tk-var';
+        paint(i, j, k);
+        i = j;
+        continue;
+      }
+      // operators (multi-char first)
+      var two = line.slice(i, i + 2);
+      if (OPS2.test(two)) { paint(i, i + 2, 'tk-op'); i += 2; continue; }
+      if (/[+\-*/=:<>,.!?\\]/.test(ch) || /[\u2192\u2200\u2227\u2228\u2261\u2afd\u2a3e\u03bb]/.test(ch)) {
+        paint(i, i + 1, 'tk-op'); i += 1; continue;
+      }
+      i += 1; // whitespace / brackets / other (left uncolored)
+    }
+    return cls;
   }
 
   function refresh() {

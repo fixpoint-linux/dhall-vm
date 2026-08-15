@@ -409,3 +409,14 @@ pre code { background: none; border: none; padding: 0; color: #d8dde6; font-size
 .lsp-diagnostics { border-top: 1px solid var(--border-soft); padding: 10px 16px; min-height: 24px; font-family: var(--mono); font-size: 0.8rem; }
 .lsp-diag.err { color: var(--error); margin: 2px 0; }
 .lsp-diag.ok { color: var(--green); }
+
+/* ---- syntax highlighting (LSP demo) ---- */
+.lsp-highlight .tk-kw     { color: #f0b429; font-weight: 600; }          /* let/in/if/else */
+.lsp-highlight .tk-type   { color: #a78bfa; font-weight: 600; }          /* Natural/Text/List */
+.lsp-highlight .tk-bool   { color: #22d3ee; }                            /* True/False */
+.lsp-highlight .tk-builtin{ color: #22d3ee; }                            /* List/map & co */
+.lsp-highlight .tk-str    { color: #34d399; }                            /* "strings" */
+.lsp-highlight .tk-num    { color: #fca5a5; }                            /* 123 / 1.5 */
+.lsp-highlight .tk-com    { color: #5b6476; font-style: italic; }        /* -- {- -} */
+.lsp-highlight .tk-op     { color: #94a3b8; }                            /* operators */
+.lsp-highlight .tk-var    { color: var(--text); }
