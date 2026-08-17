@@ -54,6 +54,18 @@ static bool is_sort(Term *t) {
     return t->tag == TmType || t->tag == TmKind || t->tag == TmSort;
 }
 
+/* Is `t` (assumed normalized) usable in TYPE position — i.e. is it a sort
+ * (Type/Kind/Sort) or the empty record type `{}`?  `{=}` parses as an empty
+ * record LITERAL, whose inferred type is `{}` (TmRecordType, n==0); since the
+ * empty record value and type coincide (alpha_eq treats TmRecordType and
+ * TmRecordLit alike), `{=}` is a valid empty-record type marker in the schema
+ * DSL.  A non-empty record type is already accepted (inferring a TmRecordType
+ * yields Type, a sort); only the empty case needs this special case. */
+static bool is_type_position(Term *t) {
+    if (is_sort(t)) return true;
+    return t->tag == TmRecordType && t->as.rec.n == 0;
+}
+
 static void err_here(DhallError *e, ErrorStage st, Term *t, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -298,12 +310,12 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
     case TmPi: {
         Term *d = infer(g, t->as.pi.dom, err);
         if (!d) return NULL;
-        if (!is_sort(normalize(d))) { err_here(err, ERR_TYPE, t, "Pi domain is not a type/sort"); return NULL; }
+        if (!is_type_position(normalize(d))) { err_here(err, ERR_TYPE, t, "Pi domain is not a type/sort"); return NULL; }
         ctx_push(g, t->as.pi.dom, "_", NULL);
         Term *c = infer(g, t->as.pi.cod, err);
         ctx_pop(g);
         if (!c) return NULL;
-        if (!is_sort(normalize(c))) { err_here(err, ERR_TYPE, t, "Pi codomain is not a type/sort"); return NULL; }
+        if (!is_type_position(normalize(c))) { err_here(err, ERR_TYPE, t, "Pi codomain is not a type/sort"); return NULL; }
         return c;
     }
     case TmApp: {
@@ -337,7 +349,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
     case TmAnn: {
         Term *tty = infer(g, t->as.ann.ty, err);
         if (!tty) return NULL;
-        if (!is_sort(normalize(tty))) { err_here(err, ERR_TYPE, t, "annotation is not a type"); return NULL; }
+        if (!is_type_position(normalize(tty))) { err_here(err, ERR_TYPE, t, "annotation is not a type"); return NULL; }
         if (!check(g, t->as.ann.e, t->as.ann.ty, err)) return NULL;
         return resolve_type(g, t->as.ann.ty, 0);
     }
@@ -372,7 +384,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
             if (!t->as.rec.fs[i].type) continue;
             Term *ty = infer(g, t->as.rec.fs[i].type, err);
             if (!ty) return NULL;
-            if (!is_sort(normalize(ty))) { err_here(err, ERR_TYPE, t, "record field type is not a type"); return NULL; }
+            if (!is_type_position(normalize(ty))) { err_here(err, ERR_TYPE, t, "record field type is not a type"); return NULL; }
         }
         return tm_type();
     }
@@ -401,7 +413,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
             if (!t->as.uni.fs[i].type) continue;
             Term *ty = infer(g, t->as.uni.fs[i].type, err);
             if (!ty) return NULL;
-            if (!is_sort(normalize(ty))) { err_here(err, ERR_TYPE, t, "union alternative type is not a type"); return NULL; }
+            if (!is_type_position(normalize(ty))) { err_here(err, ERR_TYPE, t, "union alternative type is not a type"); return NULL; }
         }
         return tm_type();
     }
@@ -468,7 +480,7 @@ static Term *infer(Ctx *g, Term *t, DhallError *err) {
     case TmNone: {
         Term *tty = infer(g, t->as.none.ty, err);
         if (!tty) return NULL;
-        if (!is_sort(normalize(tty))) { err_here(err, ERR_TYPE, t, "None type argument is not a Type"); return NULL; }
+        if (!is_type_position(normalize(tty))) { err_here(err, ERR_TYPE, t, "None type argument is not a Type"); return NULL; }
         return tm_app(tm_builtin("Optional"), t->as.none.ty);
     }
     case TmOp:
@@ -651,7 +663,7 @@ static bool check(Ctx *g, Term *t, Term *ty, DhallError *err) {
         }
         Term *tty = infer(g, t->as.none.ty, err);
         if (!tty) return false;
-        if (!is_sort(normalize(tty))) { err_here(err, ERR_TYPE, t, "None type argument is not a Type"); return false; }
+        if (!is_type_position(normalize(tty))) { err_here(err, ERR_TYPE, t, "None type argument is not a Type"); return false; }
         return true;
     }
     if (t->tag == TmRecordLit && nty->tag == TmRecordType) {

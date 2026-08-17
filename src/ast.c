@@ -275,6 +275,30 @@ static bool fields_eq(Field *a, int na, Field *b, int nb) {
 }
 
 bool alpha_eq(Term *a, Term *b) {
+    /* The empty record value `{=}` and empty record type `{}` coincide (they
+     * are the same unit term — `{=}` : `{}`).  Treat record type/literal and
+     * union type/literal as the same tag so a value and its declared type are
+     * alpha-equal; `fields_eq` already compares only the populated slots, so a
+     * record literal `{ a = 1 }` still differs from a record type `{ a : Nat }`. */
+    int atag = a->tag, btag = b->tag;
+    if (atag == TmRecordLit || atag == TmRecordType) {
+        if (btag == TmRecordLit || btag == TmRecordType) {
+            if (atag == btag) {
+                /* same record tag: normal path below (fields_eq via the switch) */
+            } else {
+                return fields_eq(a->as.rec.fs, a->as.rec.n, b->as.rec.fs, b->as.rec.n);
+            }
+        }
+    }
+    if (atag == TmUnionLit || atag == TmUnionType) {
+        if (btag == TmUnionLit || btag == TmUnionType) {
+            if (atag == btag) {
+                /* same union tag: normal path below */
+            } else {
+                return fields_eq(a->as.uni.fs, a->as.uni.n, b->as.uni.fs, b->as.uni.n);
+            }
+        }
+    }
     if (a->tag != b->tag) return false;
     switch (a->tag) {
     case TmVar: return a->as.idx == b->as.idx;
