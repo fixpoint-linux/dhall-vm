@@ -164,7 +164,20 @@ static Term *parse_let(Parser *p) {
     if (!expect(p, T_EQUALS, "'=' in let binding")) return NULL;
     Term *val = parse_term(p);
     if (!val) return NULL;
-    if (!at_name(p, "in")) { perr(p, peek(p).span, "expected 'in'"); return NULL; }
+    /* Dhall chains lets: `let a = v1 let b = v2 in body` is sugar for
+     * `let a = v1 in (let b = v2 in body)`.  So after the value, the body is
+     * EITHER `in <term>` OR another `let` binding (no `in` between bindings).
+     * Per the grammar, let-body := 'in' expr | let-binding.  Handle the
+     * chained case by recursing into parse_term, which dispatches on `let`. */
+    if (!at_name(p, "in")) {
+        /* Not `in`: the body must be another chained `let` binding. */
+        if (!at_name(p, "let")) { perr(p, peek(p).span, "expected 'in' or another 'let' binding"); return NULL; }
+        push_name(p, nt.name);
+        Term *body = parse_term(p);
+        pop_name(p);
+        if (!body) return NULL;
+        return tloc(tm_let(ann, val, body), lt.span);
+    }
     next(p);
     push_name(p, nt.name);
     Term *body = parse_term(p);
