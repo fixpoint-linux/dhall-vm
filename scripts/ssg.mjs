@@ -228,9 +228,19 @@ async function main() {
     const rendered = await renderPage(window, page.path);
     log(`  rendered ${rendered.length} bytes`);
 
+    // The playground's <dhall-playground> custom element is client-booted only:
+    // if we pre-render it into the static HTML, the client MFE re-creates a
+    // SECOND element and both boot (double editor). Strip the element from the
+    // pre-rendered markup so exactly one (the client's) ever exists.
+    let pageHtml = rendered;
+    if (page.slug === 'playground') {
+      pageHtml = rendered.replace(/<dhall-playground\b[^>]*>\s*<\/dhall-playground>/g, '');
+      if (pageHtml !== rendered) log('  stripped <dhall-playground> (client-booted)');
+    }
+
     const outputDir = page.dir === '' ? DIST : join(DIST, page.dir);
     const outputPath = join(outputDir, 'index.html');
-    const finalHtml = wrapDocument(page.title, page.title, slotHtml(page.slot, rendered));
+    const finalHtml = wrapDocument(page.title, page.title, slotHtml(page.slot, pageHtml));
     mkdirSync(outputDir, { recursive: true });
     writeFileSync(outputPath, finalHtml);
     log(`  wrote ${outputPath} (${finalHtml.length} bytes)`);

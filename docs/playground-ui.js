@@ -21,18 +21,27 @@
   'use strict';
 
   var BASE = '/dhall-c';
+  // Scope ALL DOM lookups to the <dhall-playground> element that is currently
+  // booting (set by playground-element.js before loading this script). The
+  // SSR pre-render + client MFE each create a <dhall-playground>; scoping to
+  // this element means each boot's glue touches only its OWN subtree, so a
+  // stale (removed) pre-rendered element's late boot cannot double-create the
+  // editor on the live element's shared textarea.
+  var root = window.__dhallPlaygroundRoot || document;
+  var get = function (id) { return root.querySelector('#' + id); };
+
   var Module = null;
   var currentMode = 2; // to-json by default
 
-  var outputEl = document.getElementById('output');
-  var statusEl = document.getElementById('status');
-  var runBtn = document.getElementById('runBtn');
-  var copyBtn = document.getElementById('copyBtn');
-  var modeBtns = Array.prototype.slice.call(document.querySelectorAll('#modes .mode'));
+  var outputEl = get('output');
+  var statusEl = get('status');
+  var runBtn = get('runBtn');
+  var copyBtn = get('copyBtn');
+  var modeBtns = Array.prototype.slice.call(root.querySelectorAll('#modes .mode'));
 
   // Build the CodeMirror editor over the #source textarea; expose it so the
   // LSP glue can attach lint + hover to the SAME editor.
-  var sourceEl = document.getElementById('source');
+  var sourceEl = get('source');
   var editor = CodeMirror.fromTextArea(sourceEl, {
     mode: 'dhall',
     theme: 'tokyonight',
@@ -130,7 +139,7 @@
   }
 
   // Demo footer chips.
-  var chips = document.getElementById('examplesChips');
+  var chips = get('examplesChips');
   EXAMPLES.forEach(function (ex) {
     var b = document.createElement('button');
     b.textContent = ex.name;
@@ -140,7 +149,7 @@
   });
 
   // Example showcase cards (own section).
-  var cards = document.getElementById('exCards');
+  var cards = get('exCards');
   EXAMPLES.forEach(function (ex) {
     var card = document.createElement('div');
     card.className = 'ex-card';
@@ -215,10 +224,10 @@
     var currentType = null;
     var ed = window.__dhallEditor;
 
-    var diagEl = document.getElementById('lspDiagnostics');
-    var lspStatusEl = document.getElementById('lspStatus');
-    var typeEl = document.getElementById('lspType');
-    var tooltipEl = document.getElementById('lspTooltip');
+    var diagEl = get('lspDiagnostics');
+    var lspStatusEl = get('lspStatus');
+    var typeEl = get('lspType');
+    var tooltipEl = get('lspTooltip');
 
     if (!ed) {
       if (lspStatusEl) lspStatusEl.textContent = 'LSP unavailable (no editor)';

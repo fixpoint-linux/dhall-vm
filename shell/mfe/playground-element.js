@@ -150,11 +150,16 @@ function waitConnected(element) {
 async function bootPlayground(element) {
   await waitConnected(element);
   await loadFactories();
+  // Tell playground-ui.js which element to scope its DOM lookups to. Because
+  // the SSR pre-render and the client MFE each create a <dhall-playground>,
+  // this root scoping keeps each boot's glue on its own subtree — a removed
+  // pre-rendered element's late boot won't double-create the editor on the
+  // live element's shared textarea (see the comment in playground-ui.js).
+  window.__dhallPlaygroundRoot = element;
   // playground-ui.js is NOT cached: the @mfe shell unmounts/remounts the slot on
   // cross-page SPA nav, so a fresh <dhall-playground> must re-run the UI glue
   // against its own (only) DOM. The libs (dhall.js, dhall-lsp.js, CodeMirror,
-  // dhall-mode.js) stay cached; only one playground exists at a time, so the
-  // global getElementById lookups in playground-ui.js resolve to the new element.
+  // dhall-mode.js) stay cached; only one playground exists at a time.
   await loadScript(`${BASE}/playground-ui.js`, { cache: false });
 }
 

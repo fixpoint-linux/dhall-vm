@@ -36,11 +36,15 @@ const app = await createApp({
   // (the main site owns /shell/templates). Pin the baseURL here so both route
   // templates resolve under this site's shell regardless of the deep-link subpath.
   baseURL: '/dhall-c/shell/templates',
-  // The SSG output pre-renders all content pages including the playground.
-  // Rehydrate when the current pathname matches a pre-rendered dhall-c route.
+  // The SSG output pre-renders all content pages EXCEPT the playground. The
+  // playground page ships client-booted: the <dhall-playground> custom element
+  // builds its editor on connectedCallback, and SSR rehydration would create a
+  // SECOND element (double editor). Rehydrate only the pre-rendered non-playground
+  // routes; the playground route gets a fresh client render instead.
   ssr: (() => {
     const path = (window.location.pathname.replace(/\/+$/, '') || '/');
-    return path === '/dhall-c' || path.startsWith('/dhall-c/');
+    return (path === '/dhall-c' || path.startsWith('/dhall-c/'))
+      && path !== '/dhall-c/playground';
   })(),
 });
 
