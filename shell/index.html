@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dhall-c — a Dhall subset in C, compiled to a portable APE and WebAssembly</title>
+<meta name="description" content="dhall-c: a pure-C11 subset interpreter for the Dhall configuration language, compiled with cosmocc into a portable APE plus a WebAssembly build that runs in your browser. Part of fixpoint-linux.">
+<script type="importmap">
+{
+  "imports": {
+    "@mfe/core": "/vendor/@mfe/core/index.js",
+    "@mfe/framework": "/vendor/@mfe/framework/index.js",
+    "dhallc-landing": "/dhall-c/shell/mfe/dhallc-page.js",
+    "dhallc-language": "/dhall-c/shell/mfe/dhallc-page.js",
+    "dhallc-cli": "/dhall-c/shell/mfe/dhallc-page.js",
+    "dhallc-api": "/dhall-c/shell/mfe/dhallc-page.js",
+    "dhallc-playground": "/dhall-c/shell/mfe/dhallc-page.js",
+    "fixpoint-landing": "/shell/mfe/fixpoint-landing.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app" ssr>
+  <div class="fixpoint-root">
+    <div data-mfe="dhallc-landing"><!-- ssg.mjs injects --></div>
+  </div>
+</div>
+<script type="module" src="/dhall-c/shell/shell.js"></script>
+</body>
+</html>

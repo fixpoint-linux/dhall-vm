@@ -1,0 +1,31 @@
+{
+    "name": "dhall-c",
+    "version": "1.0.0",
+    "description": "dhall-c \u2014 a pure-C11 subset interpreter for the Dhall configuration language. One C source, two targets: a native cosmocc APE binary and a WebAssembly build that runs in your browser.",
+    "main": "index.js",
+    "directories": {
+        "doc": "dist",
+        "test": "tests"
+    },
+    "scripts": {
+        "build": "./vendor/dhake/dhake.com dist/index.html"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/fixpoint-linux/dhall-c.git"
+    },
+    "keywords": [],
+    "bugs": {
+        "url": "https://github.com/fixpoint-linux/dhall-c/issues"
+    },
+    "homepage": "https://github.com/fixpoint-linux/dhall-c#readme",
+    "devDependencies": {
+        "elm": "^0.19.2-0",
+        "elm-format": "^0.8.8",
+        "happy-dom": "^20.11.6"
+    },
+    "allowScripts": {
+        "elm@0.19.2-0": true,
+        "elm-format@0.8.8": true
+    }
+}

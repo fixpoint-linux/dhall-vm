@@ -4,13 +4,34 @@ A subset interpreter for the Dhall configuration language, written in C.
 
 ## Build
 
+The build is driven by **dhake**, a Make-like build tool whose buildfile
+(`Dhakefile.dhall`) is written in Dhall. Run it from the project root:
+
 ```
-make            # produces dhall.com (APE) + dhall.com.dbg (ELF)
-make test       # runs the test suite (run.sh + roundtrip.sh + examples.sh + cli.sh)
-make bench      # builds and runs the in-process benchmark (src/bench.c)
+dhake           # produces dhall.com (APE) + dhall.com.dbg (ELF)
+dhake test      # runs the test suite (run.sh + roundtrip.sh + examples.sh + cli.sh)
+dhake bench     # builds and runs the in-process benchmark (src/bench.c)
+dhake --list    # list all targets
 ```
 
-Requires `cosmocc` (Cosmopolitan toolchain).
+Requires `cosmocc` (Cosmopolitan toolchain) and the `dhake` binary on `$PATH`.
+
+### Verified builds
+
+Every compile target in `Dhakefile.dhall` pins two kinds of sha256 hashes (dhake's
+verified-build feature, see `dhake --help` / README "Verified builds"):
+
+- **`hash`** — the expected hash of the *output* binary. The cosmocc APE output is
+  deterministic (same toolchain + sources + flags ⇒ identical bytes), so this pin is
+  sound; dhake re-checks it on every build (including up-to-date runs), catching a
+  tampered binary.
+- **`depsHash`** — the expected hash of each *source* dependency, verified *before*
+  building, catching a modified source.
+
+If a pinned hash goes stale (you edit a source or bump the toolchain), the build
+fails with the expected-vs-actual mismatch. Rebuild with `dhake --warn-hash-mismatch`
+to print the actual hashes (in copy-pasteable `sha256:<hex>` form) and copy them into
+`Dhakefile.dhall`.
 
 ## Usage
 
@@ -32,7 +53,7 @@ Input is read from a file or stdin. Exit codes: `0` ok, `1` type error,
 
 The `examples/` directory contains four self-contained (no relative-file
 import) example configuration files, each with a header comment showing the
-expected output. `make test` runs `tests/examples.sh`, which typechecks every
+expected output. `dhake test` runs `tests/examples.sh`, which typechecks every
 example and pins the serialized output against `examples/<name>.expected.*`
 snapshots, so the docs can never drift from the implementation:
 
@@ -54,15 +75,15 @@ dhall to-json examples/server.dhall
 
 ### Benchmark
 
-`make bench` builds and runs an in-process benchmark (`src/bench.c`) that
+`dhake bench` builds and runs an in-process benchmark (`src/bench.c`) that
 times the interpreter pipeline over a representative source string (~20-field
 nested record, a 200-element list, a `let`/lambda, and a `merge`), printing a
 table of `parse`, `parse+normalize`, `+infer_type`, and `+term_to_json`
 phases with derived per-phase ns/op. It is a measurement tool, not a
-correctness check, and is deliberately **not** part of `make all` or
-`make test` (timing is nondeterministic). Note that `bench.c` links the
+correctness check, and is deliberately **not** part of `dhake all` or
+`dhake test` (timing is nondeterministic). Note that `bench.c` links the
 internal API and tracks `dhall.h`, so an API change may require a rebuild of
-`make bench`.
+`dhake bench`.
 
 ### In-browser (WebAssembly) demo
 
@@ -71,12 +92,12 @@ GitHub Pages site under `docs/` (the interpreter runs 100% client-side — your
 code never leaves the browser). Build it with:
 
 ```
-make wasm           # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
-node tests/wasm-smoke.js   # headless browser-API smoke test (run by `make wasm`)
+dhake wasm      # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
+node tests/wasm-smoke.js   # headless browser-API smoke test (run by `dhake wasm`)
 node tests/wasm-fetch.js   # opt-in URL-import fetch test (needs a loopback socket)
 ```
 
-`make wasm` needs `emscripten clang lld llvm` (on Arch: `pacman -S emscripten
+`dhake wasm` needs `emscripten clang lld llvm` (on Arch: `pacman -S emscripten
 clang lld llvm`; see `scripts/build-wasm.sh` for the exact install/config
 quirks). The built `docs/dhall.js` + `docs/dhall.wasm` are committed. A GitHub
 Actions workflow (`.github/workflows/pages.yml`) deploys `docs/` to GitHub Pages
@@ -85,7 +106,7 @@ on every push to `master`; enable it once via Settings → Pages → Source →
 (`docs/index.html`) typechecks, normalizes, and serializes (JSON/TOML/YAML)
 Dhall expressions in a textarea, and loads the `examples/*.dhall` files.
 `src/wasm.c` provides the browser-callable entry point and is deliberately kept
-out of the native cosmocc build (`Makefile` `SRC`).
+out of the native cosmocc build (`Dhakefile.dhall` `core`).
 
 ## Language Server
 
@@ -95,8 +116,8 @@ Content-Length framing, reusing the interpreter core (`parse_source` /
 `infer_type` / `normalize`) for everything it reports.
 
 ```
-make dhall-lsp.com        # produces dhall-lsp.com (APE) + dhall-lsp.com.dbg (ELF)
-make test-lsp             # runs tests/lsp.sh (6 end-to-end checks)
+dhake dhall-lsp.com        # produces dhall-lsp.com (APE) + dhall-lsp.com.dbg (ELF)
+dhake test-lsp             # runs tests/lsp.sh (6 end-to-end checks)
 ```
 
 Point your editor's LSP client at the `.dbg` binary (plain static ELF, no APE

@@ -2,7 +2,7 @@
 # Opt-in LIVE test for http:// URL imports (tests/url.sh).
 #   usage: tests/url.sh [dhall-binary]
 #
-# NOT part of `make test` (the offline suite): it needs a real loopback socket
+# NOT part of `dhake test` (the offline suite): it needs a real loopback socket
 # and the DHALL_ALLOW_LOOPBACK=1 TEST-ONLY escape, which bypasses ONLY
 # 127.0.0.0/8 and ::1 (every other private/link-local/reserved range stays
 # blocked) — see src/ssrf.c. Serves a fixed body "42\n" over HTTP and verifies

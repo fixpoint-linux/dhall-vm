@@ -1,0 +1,76 @@
+# Deploy the dhall-c docs site to fixpointlinux.org/dhall-c (node-infra) on push.
+#
+# The site is an Elm app (src/Main.elm) rendered against the shared Fixpoint.*
+# design package (the `vendor/design` submodule) and pre-rendered to static
+# dist/ files by `npm run build` (dhake: elm make + scripts/ssg.mjs). The
+# workflow builds it, assembles a deploy tarball from dist/, and ships it over
+# restricted SSH to node-infra's dhall-c-receive forced command (stages +
+# promotes to /srv/www/dhall-c, served by Caddy on fixpointlinux.org/dhall-c).
+name: Deploy dhall-c site
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dhall-c
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The Elm app imports the Fixpoint.* design package from the `design`
+          # git submodule, so it must be checked out for the build. dhake (the
+          # build driver) and mfe-framework are submodules too.
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: "Build the docs site (dhake: elm + MFE vendor + SSG)"
+        # The build is driven by dhake (./Dhakefile.dhall, dist/index.html
+        # target). `npm ci` above provides the tooling dhake shells out to
+        # (elm, happy-dom, tsc in the mfe-framework submodule). vendor/dhake
+        # is the committed dhake bootstrap binary in this repo.
+        run: |
+          npm ci
+          ./vendor/dhake/dhake.com dist/index.html
+
+      - name: Assemble deploy bundle
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/dhallcpkg
+          mkdir -p /tmp/dhallcpkg/site
+          cp -r dist/. /tmp/dhallcpkg/site/
+          tar -czf /tmp/dhallcpkg/dhall-c.tar.gz -C /tmp/dhallcpkg site
+          ls -la /tmp/dhallcpkg/dhall-c.tar.gz
+
+      - name: Deploy via restricted SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          echo "$DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          cat /tmp/dhallcpkg/dhall-c.tar.gz | ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" 'cat > /dev/null'
