@@ -636,10 +636,11 @@ fn print_uni_fields(out: Out, fs: ?[*]dhall.Field, n: c_int) void {
         if (fs.?[@intCast(i)].value) |v| {
             out.str(" = ");
             print_term(out, v);
-        } else {
+        } else if (fs.?[@intCast(i)].type) |ty| {
             out.chr(':');
-            print_term(out, fs.?[@intCast(i)].type.?);
+            print_term(out, ty);
         }
+        // else: nullary alternative — bare label, no ': Type'
     }
     out.chr('>');
 }

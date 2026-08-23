@@ -571,8 +571,9 @@ fn infer(g: *Ctx, t: *dhall.Term, err: *dhall.DhallError) ?*dhall.Term {
                 } else if (src.type) |st| {
                     fs[@intCast(i)].type = st;
                 } else {
-                    err_here(err, .ERR_TYPE, t, "union literal alternative has no type", .{});
-                    return null;
+                    // nullary alternative (bare label) in a union literal:
+                    // its type is the empty record {} per the Dhall standard.
+                    fs[@intCast(i)].type = ast.tm_record_type(null, 0);
                 }
             }
             return ast.tm_union_type(fs, n);

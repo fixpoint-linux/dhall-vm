@@ -1115,10 +1115,10 @@ fn parse_union(p: *dhall.Parser) ?*dhall.Term {
                 is_lit = true;
                 _ = next(p);
                 val = parse_term(p) orelse break :blk;
-            } else {
-                perr(p, sep.span, "expected ':' or '=' in union alternative");
-                break :blk;
             }
+            // else: nullary alternative — a bare label with no ':' or '='.
+            // Leave both `ty` and `val` null (the alternative has type {} in the
+            // Dhall standard); the next token must be '|' or '>'.
             if (n == cap) {
                 cap *= 2;
                 fs = alloc.realloc(fs[0..n], cap) catch oom();

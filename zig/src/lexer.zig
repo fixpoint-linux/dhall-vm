@@ -476,7 +476,10 @@ fn tokenize(lx: *dhall.Lexer) dhall.Token {
                 while (cur(lx) == ' ' or cur(lx) == '\t' or cur(lx) == '\r' or cur(lx) == '\n')
                     _ = lexer_read_char(lx);
                 if (cur(lx) == ':' or
-                    (cur(lx) == '=' and (lx.pos + 1 >= lx.len or lx.src.?[lx.pos + 1] != '=')))
+                    (cur(lx) == '=' and (lx.pos + 1 >= lx.len or lx.src.?[lx.pos + 1] != '=')) or
+                    // nullary first alternative: `< A | B >` or `< A >`
+                    cur(lx) == '|' or
+                    cur(lx) == '>')
                     is_union = true;
             }
             lx.pos = save_pos;
