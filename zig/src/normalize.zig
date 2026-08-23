@@ -180,6 +180,36 @@ fn norm_field(t: *dhall.Term) *dhall.Term {
         }
         return t; // unreachable for well-typed terms
     }
+    // Union constructor: `(U).l` where the projection's rec normalizes to a
+    // union type reduces to the constructor:
+    //   non-nullary l : T  =>  \(x : T) -> < ... | l = x@0 | ... >
+    //     (selected alt carries var(0); other alts keep their types, shifted
+    //      +1 under the new binder; the domain T stays outside, unshifted)
+    //   nullary l (no type) =>  < ... | l = {=} | ... >  (the value itself)
+    if (r.tag == .TmUnionType) {
+        const n = r.as.uni.n;
+        var i: c_int = 0;
+        while (i < n) : (i += 1) {
+            const af = r.as.uni.fs.?[@intCast(i)];
+            if (!std.mem.eql(u8, std.mem.span(af.label.?), std.mem.span(t.as.field.label.?))) continue;
+            const fs: [*]dhall.Field = @ptrCast(@alignCast(arena.arena_alloc(arena.dhall_arena.?, @as(usize, @intCast(if (n > 0) n else 1)) * @sizeOf(dhall.Field))));
+            var j: c_int = 0;
+            while (j < n) : (j += 1) {
+                const src = r.as.uni.fs.?[@intCast(j)];
+                fs[@intCast(j)].label = src.label;
+                if (j == i) {
+                    fs[@intCast(j)].type = null;
+                    fs[@intCast(j)].value = if (src.type != null) ast.tm_var(0) else ast.tm_record_lit(null, 0);
+                } else {
+                    fs[@intCast(j)].type = if (src.type) |ty| ast.shift(1, 0, ty) else null;
+                    fs[@intCast(j)].value = null;
+                }
+            }
+            if (af.type == null) return ast.tm_union_lit(fs, n); // nullary: the value, not a function
+            return ast.tm_lam(af.type.?, ast.tm_union_lit(fs, n));
+        }
+        // unknown alternative label: keep stuck (the typechecker rejects it)
+    }
     return ast.tm_field(std.mem.span(t.as.field.label.?), r);
 }
 

@@ -62,6 +62,14 @@ const Ctx = struct {
         if (pos >= n) return null;
         return ast.shift(idx + 1, 0, self.types.items[pos]);
     }
+    fn lookup_val(self: *Ctx, idx: c_int) ?*dhall.Term {
+        const n = self.vals.items.len;
+        if (idx < 0 or idx >= n) return null;
+        const pos = n - 1 - @as(usize, @intCast(idx));
+        if (pos >= n) return null;
+        const v = self.vals.items[pos] orelse return null;
+        return ast.shift(idx + 1, 0, v);
+    }
     fn name(self: *Ctx, idx: c_int) [*:0]const u8 {
         const n = self.names.items.len;
         if (idx < 0 or idx >= n) return "?";
@@ -496,6 +504,32 @@ fn infer(g: *Ctx, t: *dhall.Term, err: *dhall.DhallError) ?*dhall.Term {
             return ast.tm_record_type(fs, n);
         },
         .TmField => {
+            // Union constructor typing: if the projection's rec normalizes to
+            // a union type, `(U).l` has the constructor's type:
+            //   nullary l (no type)   : U                    (the value itself)
+            //   non-nullary l : T     : forall (x : T) -> U' (U shifted +1 under
+            //                                                  the Pi binder)
+            {
+                var nr = normalize.normalize(t.as.field.rec.?);
+                if (nr.tag == .TmVar) {
+                    // let-bound union type (e.g. `let T = < f : Text | ... > in
+                    // T.f`): resolve the var to its stored value and retry.
+                    if (g.lookup_val(t.as.field.rec.?.as.idx)) |val| {
+                        const nv = normalize.normalize(val);
+                        if (nv.tag == .TmUnionType) nr = nv;
+                    }
+                }
+                if (nr.tag == .TmUnionType) {
+                    const i = field_find(nr.as.uni.fs, nr.as.uni.n, std.mem.span(t.as.field.label.?));
+                    if (i < 0) {
+                        err_here(err, .ERR_TYPE, t, "no such alternative: {s}", .{std.mem.span(t.as.field.label.?)});
+                        return null;
+                    }
+                    const alt = nr.as.uni.fs.?[@intCast(i)];
+                    if (alt.type == null) return nr; // nullary: not a function
+                    return ast.tm_pi(alt.type.?, ast.shift(1, 0, nr));
+                }
+            }
             const rty = infer(g, t.as.field.rec.?, err) orelse return null;
             const nt = normalize.normalize(rty);
             if (nt.tag != .TmRecordType) {
