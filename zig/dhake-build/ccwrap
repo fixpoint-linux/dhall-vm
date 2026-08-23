@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# ccwrap — flag surgery for building dhake against the Zig libdhall.so.
+# Mirrors carrasco-forcada-poc/zig/ccwrap:
+#   compile steps pass through (adding the shim include dir + dhall.h dir)
+#   link steps drop any dhall-c src/*.o set and append -L<ziglib> -ldhall -rpath
+# so dhake.c links the Zig core in-process with ZERO source changes.
+set -euo pipefail
+SHIMINC=/workspace/dhall-c/zig/dhake-build/inc
+DHALLSRC=/workspace/dhall-c/src
+ZIGLIB=/workspace/dhall-c/zig/lib
+
+has_o=0
+has_dashc=0
+for a in "$@"; do
+  case "$a" in
+    -c) has_dashc=1 ;;
+    *.o) has_o=1 ;;
+  esac
+done
+is_link=0
+if [ "$has_o" = "1" ] && [ "$has_dashc" = "0" ]; then
+  is_link=1
+fi
+
+if [ "$is_link" = "1" ]; then
+  OUT=()
+  for a in "$@"; do
+    case "$a" in
+      -static) continue ;;
+      */dhall-c/src/*.o) continue ;;
+    esac
+    OUT+=("$a")
+  done
+  OUT+=("-L$ZIGLIB" "-ldhall" "-Wl,-rpath,$ZIGLIB")
+  exec cc "${OUT[@]}"
+else
+  exec cc -I"$SHIMINC" -I"$DHALLSRC" "$@"
+fi

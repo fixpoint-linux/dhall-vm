@@ -7,3 +7,15 @@ node_modules/
 elm-stuff/
 dist/
 /vendor/@mfe/
+
+# Zig migration build artifacts
+# (the Zig CLI binary + twin drivers build to top-level zig-out/; libdhall.so
+#  and the dhake merge-gate build are reproducible via zig build-exe/build-lib)
+zig-out/
+/zig/lib/
+/zig/.zig-cache/
+/zig/dhake-build/dhake
+/zig/dhake-build/*.o
+
+# C build artifacts from the twin-driver / dhake-ABI compile steps
+*.o
