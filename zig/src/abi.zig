@@ -27,6 +27,7 @@ const parser_mod = @import("parser.zig");
 const normalize_mod = @import("normalize.zig");
 const import_mod = @import("import.zig");
 const sha256_mod = @import("sha256.zig");
+const typecheck_mod = @import("typecheck.zig");
 
 // ─── Arena ──────────────────────────────────────────────────────────────────
 // The concrete Arena is opaque on the C side (forward-declared only), so these
@@ -114,6 +115,21 @@ export fn parse_source(
     return parser_mod.parse_source(pp, src, file, ee);
 }
 
+// infer_type (the typecheck gate in compendium/src/config.c, which visage's
+// src/config.c mirrors): stock abi.zig originally omitted this because dhake
+// does not call it, but in-process consumers that walk parse -> infer ->
+// normalize do.  Exported here so libdhall.so carries the full eval pipeline.
+export fn infer_type(
+    p: ?*dhall.Parser,
+    t: ?*dhall.Term,
+    err: ?*dhall.DhallError,
+) ?*dhall.Term {
+    const pp = p orelse return null;
+    const tt = t orelse return null;
+    const ee = err orelse return null;
+    return typecheck_mod.infer_type(pp, tt, ee);
+}
+
 export fn normalize(t: ?*dhall.Term) ?*dhall.Term {
     const tt = t orelse return null;
     return normalize_mod.normalize(tt);
@@ -159,6 +175,7 @@ comptime {
     _ = &import_loader_free;
     _ = &import_loader_push_root;
     _ = &parse_source;
+    _ = &infer_type;
     _ = &normalize;
     _ = &normalize_clear_error;
     _ = &normalize_has_error;

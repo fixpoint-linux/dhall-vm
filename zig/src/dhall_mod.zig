@@ -17,3 +17,8 @@ pub const import_mod = @import("import.zig");
 pub const bignum = @import("bignum.zig");
 pub const builtins = @import("builtins.zig");
 pub const lexer = @import("lexer.zig");
+// SHA-256 (FIPS 180-4) — bare hex helper needed by the fx-core mutation core
+// (src/fx-caslog.zig) for content-addressed-store blob hashing.  Exported here
+// rather than re-implemented so the CAS stays byte-identical to the dhall
+// content-integrity hash the rest of fx uses.
+pub const sha256 = @import("sha256.zig");
