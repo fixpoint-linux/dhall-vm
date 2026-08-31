@@ -1,0 +1,7 @@
+T_STR_OPEN 1:1 <none>
+T_ERROR 1:2 unexpected character '$'
+T_LBRACE 1:3 <none>
+T_NAME 1:4 True
+T_RBRACE 1:8 <none>
+T_STR_OPEN 1:9 <none>
+T_EOF 2:1 <none>

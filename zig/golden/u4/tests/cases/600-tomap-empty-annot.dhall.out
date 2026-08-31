@@ -1,0 +1,5 @@
+=== tests/cases/600-tomap-empty-annot.dhall
+T ((toMap {}) : (List {mapKey:Text,mapValue:Natural}))
+SHIFT ((toMap {}) : (List {mapKey:Text,mapValue:Natural}))
+SUB ((toMap {}) : (List {mapKey:Text,mapValue:Natural}))
+AE 1 1 1

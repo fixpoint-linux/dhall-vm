@@ -1,0 +1,1 @@
+(TmText 1:1 (expr (TmApp 2:3 (TmBuiltin 2:3 Natural/show) (TmConst 2:16 C_NAT 1))) (lit "      foo\n  bar\n"))

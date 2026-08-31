@@ -1,0 +1,5 @@
+=== tests/cases/942-dblshow-sum.dhall
+T (Double/show (0.1 + 0.2))
+SHIFT (Double/show (0.1 + 0.2))
+SUB (Double/show (0.1 + 0.2))
+AE 1 1 1

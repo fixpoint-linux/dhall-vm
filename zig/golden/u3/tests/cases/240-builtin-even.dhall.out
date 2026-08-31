@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F a 0 (TmApp 1:4 (TmBuiltin 1:4 Natural/even) (TmConst 1:17 C_NAT 4)))(F b 0 (TmApp 1:22 (TmBuiltin 1:22 Natural/even) (TmConst 1:35 C_NAT 5)))))

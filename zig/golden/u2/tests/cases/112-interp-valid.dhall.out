@@ -1,0 +1,15 @@
+T_NAME 1:1 let
+T_NAME 1:5 x
+T_EQUALS 1:7 <none>
+T_STR_OPEN 1:9 <none>
+T_NAME 1:10 hi
+T_STR_OPEN 1:12 <none>
+T_NAME 1:14 in
+T_STR_OPEN 1:17 <none>
+T_NAME 1:18 say
+T_ERROR 1:22 unexpected character '$'
+T_LBRACE 1:23 <none>
+T_NAME 1:24 x
+T_RBRACE 1:25 <none>
+T_STR_OPEN 1:26 <none>
+T_EOF 2:1 <none>

@@ -1,0 +1,5 @@
+=== tests/cases/610-err-tomap-empty-noannot.dhall
+T (toMap {})
+SHIFT (toMap {})
+SUB (toMap {})
+AE 1 1 1

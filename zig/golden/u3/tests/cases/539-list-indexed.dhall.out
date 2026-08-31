@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmApp 1:1 (TmBuiltin 1:1 List/indexed) (TmBuiltin 1:14 Natural)) (TmCons 1:22 (TmConst 1:23 C_NAT 10) (TmCons 1:26 (TmConst 1:26 C_NAT 20) (TmNil 0:0))))

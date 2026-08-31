@@ -1,0 +1,5 @@
+=== tests/cases/345-unicode-forall.dhall
+T forall (_ : Natural) -> Natural
+SHIFT forall (_ : Natural) -> Natural
+SUB forall (_ : Natural) -> Natural
+AE 1 1 1

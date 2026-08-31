@@ -1,0 +1,1 @@
+(TmOp 1:2 OP_LE (TmConst 1:1 C_NAT 2) (TmConst 1:4 C_NAT 2))

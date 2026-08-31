@@ -1,0 +1,5 @@
+=== tests/cases/310-multiline-escaped-quote.dhall
+T "''\n"
+SHIFT "''\n"
+SUB "''\n"
+AE 1 1 1

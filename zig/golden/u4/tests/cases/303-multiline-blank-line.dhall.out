@@ -1,0 +1,5 @@
+=== tests/cases/303-multiline-blank-line.dhall
+T "foo\n\nbar\n"
+SHIFT "foo\n\nbar\n"
+SUB "foo\n\nbar\n"
+AE 1 1 1

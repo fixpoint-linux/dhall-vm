@@ -1,0 +1,5 @@
+=== tests/cases/501-or.dhall
+T (False || True)
+SHIFT (False || True)
+SUB (False || True)
+AE 1 1 1

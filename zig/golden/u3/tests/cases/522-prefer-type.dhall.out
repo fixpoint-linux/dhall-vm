@@ -1,0 +1,1 @@
+(TmPrefer 1:12 (TmRecordType 1:1 ((F a (TmBuiltin 1:4 Natural) 0))) (TmRecordType 1:14 ((F b (TmBuiltin 1:17 Bool) 0))))

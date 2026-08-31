@@ -1,0 +1,5 @@
+T_STR_OPEN_MULTILINE 1:1 <none>
+T_STR_OPEN_MULTILINE 2:1 <none>
+T_ERROR 2:3 unexpected character '''
+T_STR_OPEN_MULTILINE 3:1 <none>
+T_EOF 4:1 <none>

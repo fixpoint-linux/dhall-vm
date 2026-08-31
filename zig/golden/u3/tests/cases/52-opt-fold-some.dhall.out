@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmApp 1:1 (TmApp 1:1 (TmApp 1:1 (TmApp 1:1 (TmBuiltin 1:1 Optional/fold) (TmBuiltin 1:15 Natural)) (TmSome 1:24 (TmConst 1:29 C_NAT 5))) (TmBuiltin 1:32 Natural)) (TmLam 1:41 (TmBuiltin 1:45 Natural) (TmVar 1:55 0))) (TmConst 1:58 C_NAT 0))

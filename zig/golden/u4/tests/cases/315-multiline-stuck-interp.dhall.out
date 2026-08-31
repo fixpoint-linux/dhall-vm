@@ -1,0 +1,5 @@
+=== tests/cases/315-multiline-stuck-interp.dhall
+T \(_ : Text) -> "${_0}\n"
+SHIFT \(_ : Text) -> "${_0}\n"
+SUB \(_ : Text) -> "${_0}\n"
+AE 1 1 1

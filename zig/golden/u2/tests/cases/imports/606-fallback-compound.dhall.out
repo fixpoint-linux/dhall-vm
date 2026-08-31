@@ -1,0 +1,6 @@
+T_IMPORT 1:1 ./nope.dhall
+T_PLUS 1:14 <none>
+T_NAT 1:16 1
+T_QMARK 1:18 <none>
+T_NAT 1:20 42
+T_EOF 2:1 <none>

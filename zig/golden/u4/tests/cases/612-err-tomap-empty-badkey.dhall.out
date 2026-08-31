@@ -1,0 +1,5 @@
+=== tests/cases/612-err-tomap-empty-badkey.dhall
+T ((toMap {}) : (List {mapKey:Natural,mapValue:Natural}))
+SHIFT ((toMap {}) : (List {mapKey:Natural,mapValue:Natural}))
+SUB ((toMap {}) : (List {mapKey:Natural,mapValue:Natural}))
+AE 1 1 1

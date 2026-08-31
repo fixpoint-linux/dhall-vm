@@ -1,0 +1,1 @@
+(TmLam 1:1 (TmPi 1:15 (TmBuiltin 1:7 Natural) (TmBuiltin 1:19 Natural)) (TmApp 1:32 (TmVar 1:32 0) (TmConst 1:34 C_NAT 1)))

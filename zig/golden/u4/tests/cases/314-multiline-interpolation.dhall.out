@@ -1,0 +1,5 @@
+=== tests/cases/314-multiline-interpolation.dhall
+T (let = "hi" in "${_0}\n")
+SHIFT (let = "hi" in "${_0}\n")
+SUB (let = "hi" in "${_0}\n")
+AE 1 1 1

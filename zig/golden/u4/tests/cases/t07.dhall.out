@@ -1,0 +1,5 @@
+=== tests/cases/t07.dhall
+T {a=([] : (List Natural))}
+SHIFT {a=([] : (List Natural))}
+SUB {a=([] : (List Natural))}
+AE 1 1 1

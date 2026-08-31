@@ -1,0 +1,5 @@
+=== tests/cases/74-show.dhall
+T (Natural/show 42)
+SHIFT (Natural/show 42)
+SUB (Natural/show 42)
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/521-prefer-disjoint.dhall
+T ({a=1} // {b=True})
+SHIFT ({a=1} // {b=True})
+SUB ({a=1} // {b=True})
+AE 1 1 1

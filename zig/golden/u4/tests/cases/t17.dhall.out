@@ -1,0 +1,5 @@
+=== tests/cases/t17.dhall
+T {x=None Natural}
+SHIFT {x=None Natural}
+SUB {x=None Natural}
+AE 1 1 1

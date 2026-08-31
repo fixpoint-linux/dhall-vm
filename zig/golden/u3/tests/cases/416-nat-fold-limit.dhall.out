@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmApp 1:1 (TmApp 1:1 (TmApp 1:1 (TmBuiltin 1:1 Natural/fold) (TmConst 1:14 C_NAT 18446744073709551616)) (TmBuiltin 1:35 Natural)) (TmLam 1:44 (TmBuiltin 1:48 Natural) (TmVar 1:58 0))) (TmConst 1:61 C_NAT 0))

@@ -1,0 +1,1 @@
+(TmLam 1:1 (TmBuiltin 1:7 Text) (TmText 1:16 (lit "a") (expr (TmVar 1:20 0)) (lit "b")))

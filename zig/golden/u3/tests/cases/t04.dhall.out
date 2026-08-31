@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F a 0 (TmCons 1:4 (TmConst 1:5 C_NAT 1) (TmCons 1:7 (TmConst 1:7 C_NAT 2) (TmCons 1:9 (TmConst 1:9 C_NAT 3) (TmNil 0:0)))))))

@@ -1,0 +1,5 @@
+=== tests/cases/21-sorted-json.dhall
+T {a=2,b=1}
+SHIFT {a=2,b=1}
+SUB {a=2,b=1}
+AE 1 1 1

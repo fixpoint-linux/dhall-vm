@@ -1,0 +1,5 @@
+=== tests/cases/72-ne.dhall
+T (True != False)
+SHIFT (True != False)
+SUB (True != False)
+AE 1 1 1

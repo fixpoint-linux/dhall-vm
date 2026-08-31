@@ -1,0 +1,5 @@
+=== tests/cases/13-list-literal.dhall
+T [1,2,3]
+SHIFT [1,2,3]
+SUB [1,2,3]
+AE 1 1 1

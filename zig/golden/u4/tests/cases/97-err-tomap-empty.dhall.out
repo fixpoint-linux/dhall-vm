@@ -1,0 +1,5 @@
+=== tests/cases/97-err-tomap-empty.dhall
+T (toMap {})
+SHIFT (toMap {})
+SUB (toMap {})
+AE 1 1 1

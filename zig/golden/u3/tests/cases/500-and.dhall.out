@@ -1,0 +1,1 @@
+(TmOp 1:6 OP_AND (TmConst 1:1 C_BOOL True) (TmConst 1:9 C_BOOL False))

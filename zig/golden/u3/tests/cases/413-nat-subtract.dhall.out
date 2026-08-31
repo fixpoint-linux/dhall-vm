@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmApp 1:1 (TmBuiltin 1:1 Natural/subtract) (TmConst 1:18 C_NAT 18446744073709551616)) (TmConst 1:39 C_NAT 18446744073709551617))

@@ -1,0 +1,5 @@
+=== tests/cases/913-int-todouble.dhall
+T (Integer/toDouble -9223372036854775809)
+SHIFT (Integer/toDouble -9223372036854775809)
+SUB (Integer/toDouble -9223372036854775809)
+AE 1 1 1

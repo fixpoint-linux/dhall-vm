@@ -1,0 +1,5 @@
+=== tests/cases/242-builtin-toInteger.dhall
+T (Natural/toInteger 42)
+SHIFT (Natural/toInteger 42)
+SUB (Natural/toInteger 42)
+AE 1 1 1

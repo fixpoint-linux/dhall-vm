@@ -1,0 +1,1 @@
+(TmAssert 1:1 (TmOp 1:14 OP_EQ (TmOp 1:12 OP_ADD (TmConst 1:11 C_NAT 1) (TmConst 1:13 C_NAT 1)) (TmConst 1:16 C_NAT 2)))

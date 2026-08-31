@@ -1,0 +1,5 @@
+=== tests/cases/30-err-ann.dhall
+T (1 : Bool)
+SHIFT (1 : Bool)
+SUB (1 : Bool)
+AE 1 1 1

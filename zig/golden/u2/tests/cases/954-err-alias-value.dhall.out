@@ -1,0 +1,16 @@
+T_NAME 1:1 let
+T_NAME 1:5 T
+T_EQUALS 1:7 <none>
+T_NAME 1:9 Natural
+T_NAME 2:1 in
+T_NAME 2:5 let
+T_NAME 2:9 x
+T_COLON 2:11 <none>
+T_NAME 2:13 T
+T_EQUALS 2:15 <none>
+T_STR_OPEN 2:17 <none>
+T_NAME 2:18 wrong
+T_STR_OPEN 2:23 <none>
+T_NAME 3:1 in
+T_NAME 3:5 x
+T_EOF 4:1 <none>

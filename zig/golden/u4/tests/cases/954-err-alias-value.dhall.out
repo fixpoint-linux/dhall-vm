@@ -1,0 +1,5 @@
+=== tests/cases/954-err-alias-value.dhall
+T (let = Natural in (let = "wrong" in _0))
+SHIFT (let = Natural in (let = "wrong" in _0))
+SUB (let = Natural in (let = "wrong" in _0))
+AE 1 1 1

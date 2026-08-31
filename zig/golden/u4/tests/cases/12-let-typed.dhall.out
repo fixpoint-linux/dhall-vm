@@ -1,0 +1,5 @@
+=== tests/cases/12-let-typed.dhall
+T (let = 5 in _0)
+SHIFT (let = 5 in _0)
+SUB (let = 5 in _0)
+AE 1 1 1

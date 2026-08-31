@@ -1,0 +1,5 @@
+=== tests/cases/502-or-and-precedence.dhall
+T (False || (True && False))
+SHIFT (False || (True && False))
+SUB (False || (True && False))
+AE 1 1 1

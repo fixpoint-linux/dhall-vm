@@ -1,0 +1,7 @@
+T_NAME 1:1 if
+T_NAT 1:4 1
+T_NAME 1:6 then
+T_NAT 1:11 2
+T_NAME 1:13 else
+T_NAT 1:18 3
+T_EOF 2:1 <none>

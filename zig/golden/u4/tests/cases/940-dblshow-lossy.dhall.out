@@ -1,0 +1,5 @@
+=== tests/cases/940-dblshow-lossy.dhall
+T (Double/show 0.123456789)
+SHIFT (Double/show 0.123456789)
+SUB (Double/show 0.123456789)
+AE 1 1 1

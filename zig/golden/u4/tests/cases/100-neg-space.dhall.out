@@ -1,0 +1,5 @@
+=== tests/cases/100-neg-space.dhall
+T -5
+SHIFT -5
+SUB -5
+AE 1 1 1

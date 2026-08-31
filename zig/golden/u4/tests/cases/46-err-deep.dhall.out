@@ -1,0 +1,2 @@
+=== tests/cases/46-err-deep.dhall
+ERROR 2 1:1001 expression nesting too deep (max 1000)

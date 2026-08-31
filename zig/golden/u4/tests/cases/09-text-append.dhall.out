@@ -1,0 +1,5 @@
+=== tests/cases/09-text-append.dhall
+T ("a" ++ "b")
+SHIFT ("a" ++ "b")
+SUB ("a" ++ "b")
+AE 1 1 1

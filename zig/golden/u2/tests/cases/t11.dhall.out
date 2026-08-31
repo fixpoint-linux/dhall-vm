@@ -1,0 +1,10 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 f
+T_EQUALS 1:3 <none>
+T_DBL 1:4 3ff0000000000000
+T_COMMA 1:7 <none>
+T_NAME 1:8 g
+T_EQUALS 1:9 <none>
+T_DBL 1:10 3fe0000000000000
+T_RBRACE 1:13 <none>
+T_EOF 2:1 <none>

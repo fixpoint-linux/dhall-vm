@@ -1,0 +1,9 @@
+T_LAMBDA 1:1 <none>
+T_LPAREN 1:3 <none>
+T_NAME 1:4 x
+T_COLON 1:6 <none>
+T_NAME 1:8 Natural
+T_RPAREN 1:15 <none>
+T_ARROW 1:17 <none>
+T_NAME 1:21 x
+T_EOF 2:1 <none>

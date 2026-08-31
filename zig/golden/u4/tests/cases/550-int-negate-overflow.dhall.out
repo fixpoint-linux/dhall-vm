@@ -1,0 +1,5 @@
+=== tests/cases/550-int-negate-overflow.dhall
+T (Integer/negate -9223372036854775808)
+SHIFT (Integer/negate -9223372036854775808)
+SUB (Integer/negate -9223372036854775808)
+AE 1 1 1

@@ -1,0 +1,2 @@
+=== tests/cases/39-err-unknown-var.dhall
+ERROR 2 1:1 unbound variable 'nonexistent'

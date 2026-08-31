@@ -1,0 +1,5 @@
+=== tests/cases/18-record-type.dhall
+T {a:Natural,b:Bool}
+SHIFT {a:Natural,b:Bool}
+SUB {a:Natural,b:Bool}
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/10-interp.dhall
+T "hello ${"world"}"
+SHIFT "hello ${"world"}"
+SUB "hello ${"world"}"
+AE 1 1 1

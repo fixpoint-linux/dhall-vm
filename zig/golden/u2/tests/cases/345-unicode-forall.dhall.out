@@ -1,0 +1,9 @@
+T_NAME 1:1 forall
+T_LPAREN 1:4 <none>
+T_NAME 1:5 x
+T_COLON 1:7 <none>
+T_NAME 1:9 Natural
+T_RPAREN 1:16 <none>
+T_ARROW 1:18 <none>
+T_NAME 1:22 Natural
+T_EOF 2:1 <none>

@@ -1,0 +1,5 @@
+=== tests/cases/34-err-app-nonfunc.dhall
+T (1 2)
+SHIFT (1 2)
+SUB (1 2)
+AE 1 1 1

@@ -1,0 +1,6 @@
+T_STR_OPEN 1:1 <none>
+T_NAME 1:2 x
+T_STR_OPEN 1:3 <none>
+T_PLUS 1:4 <none>
+T_NAT 1:5 1
+T_EOF 2:1 <none>

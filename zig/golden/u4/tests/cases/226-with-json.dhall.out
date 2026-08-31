@@ -1,0 +1,5 @@
+=== tests/cases/226-with-json.dhall
+T ({a=1,b={x=1}} with b.y = 2)
+SHIFT ({a=1,b={x=1}} with b.y = 2)
+SUB ({a=1,b={x=1}} with b.y = 2)
+AE 1 1 1

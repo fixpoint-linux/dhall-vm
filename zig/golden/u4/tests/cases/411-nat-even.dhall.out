@@ -1,0 +1,5 @@
+=== tests/cases/411-nat-even.dhall
+T (Natural/even 18446744073709551616)
+SHIFT (Natural/even 18446744073709551616)
+SUB (Natural/even 18446744073709551616)
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/62-sub.dhall
+T (7 - 2)
+SHIFT (7 - 2)
+SUB (7 - 2)
+AE 1 1 1

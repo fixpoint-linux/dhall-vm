@@ -1,0 +1,6 @@
+T_NAME 1:1 Some
+T_NAT 1:6 1
+T_COLON 1:8 <none>
+T_NAME 1:10 Optional
+T_NAME 1:19 Natural
+T_EOF 2:1 <none>

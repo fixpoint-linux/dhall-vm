@@ -1,0 +1,8 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:3 x
+T_EQUALS 1:5 <none>
+T_STR_OPEN_MULTILINE 1:7 <none>
+T_NAME 2:1 foo
+T_STR_OPEN_MULTILINE 3:1 <none>
+T_RBRACE 3:4 <none>
+T_EOF 4:1 <none>

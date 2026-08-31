@@ -1,0 +1,5 @@
+=== tests/cases/535-text-show.dhall
+T (Text/show "a\n")
+SHIFT (Text/show "a\n")
+SUB (Text/show "a\n")
+AE 1 1 1

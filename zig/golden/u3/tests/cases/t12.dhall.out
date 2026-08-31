@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F b 0 (TmConst 1:9 C_BOOL True))(F i 0 (TmConst 1:16 C_INT -7))(F n 0 (TmConst 1:4 C_NAT 42))))

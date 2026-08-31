@@ -5,7 +5,7 @@
 # NOT part of `dhake test` (the offline suite): it needs a real loopback socket
 # and the DHALL_ALLOW_LOOPBACK=1 TEST-ONLY escape, which bypasses ONLY
 # 127.0.0.0/8 and ::1 (every other private/link-local/reserved range stays
-# blocked) — see src/ssrf.c. Serves a fixed body "42\n" over HTTP and verifies
+# blocked) — see zig/src/ssrf.zig. Serves a fixed body "42\n" over HTTP and verifies
 # the interpreter fetches it, sha256-verifies it, and normalizes it, plus two
 # negatives (hash mismatch, redirect-to-blocked). Gracefully SKIPs (exit 0) if
 # it cannot bind a loopback port or no python3 is available.

@@ -1,0 +1,5 @@
+=== tests/cases/99-assert-stuck.dhall
+T (assert : \(_ : Bool) -> _0)
+SHIFT (assert : \(_ : Bool) -> _0)
+SUB (assert : \(_ : Bool) -> _0)
+AE 1 1 1

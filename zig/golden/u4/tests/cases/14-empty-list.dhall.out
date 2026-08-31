@@ -1,0 +1,5 @@
+=== tests/cases/14-empty-list.dhall
+T ([] : (List Natural))
+SHIFT ([] : (List Natural))
+SUB ([] : (List Natural))
+AE 1 1 1

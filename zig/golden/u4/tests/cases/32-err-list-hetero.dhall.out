@@ -1,0 +1,5 @@
+=== tests/cases/32-err-list-hetero.dhall
+T [1,True]
+SHIFT [1,True]
+SUB [1,True]
+AE 1 1 1

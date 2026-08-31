@@ -1,0 +1,13 @@
+T_NAME 1:1 assert
+T_COLON 1:8 <none>
+T_LPAREN 1:10 <none>
+T_LAMBDA 1:11 <none>
+T_LPAREN 1:12 <none>
+T_NAME 1:13 x
+T_COLON 1:15 <none>
+T_NAME 1:17 Bool
+T_RPAREN 1:21 <none>
+T_ARROW 1:23 <none>
+T_NAME 1:26 x
+T_RPAREN 1:27 <none>
+T_EOF 2:1 <none>

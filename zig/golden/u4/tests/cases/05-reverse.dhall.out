@@ -1,0 +1,5 @@
+=== tests/cases/05-reverse.dhall
+T ((List/reverse Natural) [1,2,3])
+SHIFT ((List/reverse Natural) [1,2,3])
+SUB ((List/reverse Natural) [1,2,3])
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/613-err-tomap-nonempty-mismatch.dhall
+T ((toMap {a=1}) : (List {mapKey:Text,mapValue:Bool}))
+SHIFT ((toMap {a=1}) : (List {mapKey:Text,mapValue:Bool}))
+SUB ((toMap {a=1}) : (List {mapKey:Text,mapValue:Bool}))
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/y09.dhall
+T {x=Some 5,y=None Natural}
+SHIFT {x=Some 5,y=None Natural}
+SUB {x=Some 5,y=None Natural}
+AE 1 1 1

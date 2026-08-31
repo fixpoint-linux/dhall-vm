@@ -1,0 +1,1 @@
+(TmPrefer 1:10 (TmRecordLit 1:1 ((F a 0 (TmConst 1:4 C_NAT 1))(F b 0 (TmConst 1:8 C_NAT 2)))) (TmRecordLit 1:12 ((F a 0 (TmConst 1:15 C_NAT 3))(F c 0 (TmConst 1:19 C_NAT 4)))))

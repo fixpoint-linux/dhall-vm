@@ -1,0 +1,6 @@
+T_IMPORT 1:1 missing
+T_QMARK 1:9 <none>
+T_IMPORT 1:11 missing
+T_QMARK 1:19 <none>
+T_NAT 1:21 42
+T_EOF 2:1 <none>

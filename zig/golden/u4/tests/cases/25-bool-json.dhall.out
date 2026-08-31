@@ -1,0 +1,5 @@
+=== tests/cases/25-bool-json.dhall
+T True
+SHIFT True
+SUB True
+AE 1 1 1

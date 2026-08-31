@@ -1,0 +1,5 @@
+=== tests/cases/17-forall.dhall
+T forall (_ : Type) -> forall (_ : _0) -> _1
+SHIFT forall (_ : Type) -> forall (_ : _0) -> _1
+SUB forall (_ : Type) -> forall (_ : _0) -> _1
+AE 1 1 1

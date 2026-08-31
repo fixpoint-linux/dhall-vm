@@ -1,0 +1,17 @@
+T_NAME 1:1 Natural/fold
+T_NAT 1:14 3
+T_NAME 1:16 Natural
+T_LPAREN 1:24 <none>
+T_LAMBDA 1:25 <none>
+T_LPAREN 1:26 <none>
+T_NAME 1:27 x
+T_COLON 1:28 <none>
+T_NAME 1:29 Natural
+T_RPAREN 1:36 <none>
+T_ARROW 1:37 <none>
+T_NAME 1:39 x
+T_PLUS 1:40 <none>
+T_NAT 1:41 1
+T_RPAREN 1:42 <none>
+T_NAT 1:44 0
+T_EOF 2:1 <none>

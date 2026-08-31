@@ -1,0 +1,5 @@
+=== tests/cases/344-ascii-lambda-arrow.dhall
+T \(_ : Natural) -> _0
+SHIFT \(_ : Natural) -> _0
+SUB \(_ : Natural) -> _0
+AE 1 1 1

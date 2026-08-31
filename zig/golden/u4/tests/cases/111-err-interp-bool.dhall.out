@@ -1,0 +1,5 @@
+=== tests/cases/111-err-interp-bool.dhall
+T "${True}"
+SHIFT "${True}"
+SUB "${True}"
+AE 1 1 1

@@ -1,0 +1,1 @@
+(TmLet 1:1 0 (TmRecordLit 1:9 ((F x 0 (TmConst 1:12 C_NAT 1)))) (TmCombine 1:23 (TmRecordLit 1:18 ((F a 0 (TmVar 1:21 0)))) (TmRecordLit 1:25 ((F a 0 (TmRecordLit 1:28 ((F y 0 (TmConst 1:31 C_NAT 2)))))))))

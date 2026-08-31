@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmBuiltin 1:1 Natural/toInteger) (TmConst 1:19 C_NAT 42))

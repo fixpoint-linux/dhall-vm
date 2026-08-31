@@ -1,0 +1,5 @@
+=== tests/cases/112-interp-valid.dhall
+T (let = "hi" in "say ${_0}")
+SHIFT (let = "hi" in "say ${_0}")
+SUB (let = "hi" in "say ${_0}")
+AE 1 1 1

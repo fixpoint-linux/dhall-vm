@@ -1,0 +1,2 @@
+=== tests/cases/320-err-lone-quote.dhall
+ERROR 1 1:1 unexpected character '''

@@ -1,0 +1,10 @@
+T_NAME 1:1 List/reverse
+T_NAME 1:14 Natural
+T_LBRACKET 1:22 <none>
+T_NAT 1:23 1
+T_COMMA 1:24 <none>
+T_NAT 1:25 2
+T_COMMA 1:26 <none>
+T_NAT 1:27 3
+T_RBRACKET 1:28 <none>
+T_EOF 2:1 <none>

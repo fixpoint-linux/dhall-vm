@@ -1,0 +1,5 @@
+=== tests/cases/946-dblshow-tiny.dhall
+T (Double/show 1e-300)
+SHIFT (Double/show 1e-300)
+SUB (Double/show 1e-300)
+AE 1 1 1

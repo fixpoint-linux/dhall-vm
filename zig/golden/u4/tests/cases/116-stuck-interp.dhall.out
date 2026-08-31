@@ -1,0 +1,5 @@
+=== tests/cases/116-stuck-interp.dhall
+T \(_ : Text) -> "${_0}"
+SHIFT \(_ : Text) -> "${_0}"
+SUB \(_ : Text) -> "${_0}"
+AE 1 1 1

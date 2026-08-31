@@ -1,0 +1,5 @@
+=== tests/cases/92-err-assert.dhall
+T (assert : False)
+SHIFT (assert : False)
+SUB (assert : False)
+AE 1 1 1

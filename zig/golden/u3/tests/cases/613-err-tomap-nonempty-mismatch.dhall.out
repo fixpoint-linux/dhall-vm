@@ -1,0 +1,1 @@
+(TmAnn 1:17 (TmToMap 1:1 (TmRecordLit 1:7 ((F a 0 (TmConst 1:13 C_NAT 1))))) (TmApp 1:19 (TmBuiltin 1:19 List) (TmRecordType 1:24 ((F mapKey (TmBuiltin 1:35 Text) 0)(F mapValue (TmBuiltin 1:52 Bool) 0)))))

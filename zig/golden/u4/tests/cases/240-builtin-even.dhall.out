@@ -1,0 +1,5 @@
+=== tests/cases/240-builtin-even.dhall
+T {a=(Natural/even 4),b=(Natural/even 5)}
+SHIFT {a=(Natural/even 4),b=(Natural/even 5)}
+SUB {a=(Natural/even 4),b=(Natural/even 5)}
+AE 1 1 1

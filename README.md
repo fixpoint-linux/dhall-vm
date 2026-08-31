@@ -1,37 +1,32 @@
 # dhall-c
 
-A subset interpreter for the Dhall configuration language, written in C.
+A subset interpreter for the Dhall configuration language, written in Zig
+(ported from an earlier C implementation, now removed — the Zig port in
+`zig/src/` is canonical).
 
 ## Build
 
-The build is driven by **dhake**, a Make-like build tool whose buildfile
-(`Dhakefile.dhall`) is written in Dhall. Run it from the project root:
+The interpreter is built from Zig (the canonical implementation lives in
+`zig/src/`). Requires Zig 0.16 and libc:
 
 ```
-dhake           # produces dhall.com (APE) + dhall.com.dbg (ELF)
-dhake test      # runs the test suite (run.sh + roundtrip.sh + examples.sh + cli.sh)
-dhake bench     # builds and runs the in-process benchmark (src/bench.c)
-dhake --list    # list all targets
+zig build-exe -O ReleaseSafe -lc -femit-bin=zig-out/bin/dhall zig/src/main.zig
 ```
 
-Requires `cosmocc` (Cosmopolitan toolchain) and the `dhake` binary on `$PATH`.
+This produces the CLI (`zig-out/bin/dhall`), used by `zig/dhall_diff.sh` as the
+Zig driver. The C-ABI shared library that in-process consumers (dhake, etc.)
+link against is:
 
-### Verified builds
+```
+zig build-lib -O ReleaseSafe -lc -dynamic -femit-bin=zig/lib/libdhall.so zig/src/abi.zig
+```
 
-Every compile target in `Dhakefile.dhall` pins two kinds of sha256 hashes (dhake's
-verified-build feature, see `dhake --help` / README "Verified builds"):
-
-- **`hash`** — the expected hash of the *output* binary. The cosmocc APE output is
-  deterministic (same toolchain + sources + flags ⇒ identical bytes), so this pin is
-  sound; dhake re-checks it on every build (including up-to-date runs), catching a
-  tampered binary.
-- **`depsHash`** — the expected hash of each *source* dependency, verified *before*
-  building, catching a modified source.
-
-If a pinned hash goes stale (you edit a source or bump the toolchain), the build
-fails with the expected-vs-actual mismatch. Rebuild with `dhake --warn-hash-mismatch`
-to print the actual hashes (in copy-pasteable `sha256:<hex>` form) and copy them into
-`Dhakefile.dhall`.
+The original C sources (`src/*.c`) and their `dhake`/`cosmocc` build have been
+removed. The committed APE binaries (`dhall.com`, `dhall.com.dbg`,
+`dhall-lsp.com`, …) remain only as the differential oracle for
+`zig/dhall_diff.sh` and are no longer rebuilt from source. The `Dhakefile.dhall`
+still drives the docs site (`dhake dist/index.html`); its interpreter/lsp/bench
+C targets are gone.
 
 ## Usage
 
@@ -53,7 +48,7 @@ Input is read from a file or stdin. Exit codes: `0` ok, `1` type error,
 
 The `examples/` directory contains four self-contained (no relative-file
 import) example configuration files, each with a header comment showing the
-expected output. `dhake test` runs `tests/examples.sh`, which typechecks every
+expected output. `tests/examples.sh` (run with the Zig CLI) typechecks every
 example and pins the serialized output against `examples/<name>.expected.*`
 snapshots, so the docs can never drift from the implementation:
 
@@ -75,15 +70,8 @@ dhall to-json examples/server.dhall
 
 ### Benchmark
 
-`dhake bench` builds and runs an in-process benchmark (`src/bench.c`) that
-times the interpreter pipeline over a representative source string (~20-field
-nested record, a 200-element list, a `let`/lambda, and a `merge`), printing a
-table of `parse`, `parse+normalize`, `+infer_type`, and `+term_to_json`
-phases with derived per-phase ns/op. It is a measurement tool, not a
-correctness check, and is deliberately **not** part of `dhake all` or
-`dhake test` (timing is nondeterministic). Note that `bench.c` links the
-internal API and tracks `dhall.h`, so an API change may require a rebuild of
-`dhake bench`.
+The C in-process benchmark (`src/bench.c`, built via `dhake bench`) was removed
+along with the C sources; there is no Zig benchmark target.
 
 ### In-browser (WebAssembly) demo
 
@@ -103,18 +91,18 @@ repo.
 
 ## Language Server
 
-A Language Server Protocol (LSP) server (`dhall-lsp.com`) gives editors live
+A Language Server Protocol (LSP) server gives editors live
 diagnostics and hover types. It speaks JSON-RPC 2.0 over stdio with
 Content-Length framing, reusing the interpreter core (`parse_source` /
 `infer_type` / `normalize`) for everything it reports.
 
 ```
-dhake dhall-lsp.com        # produces dhall-lsp.com (APE) + dhall-lsp.com.dbg (ELF)
-dhake test-lsp             # runs tests/lsp.sh (6 end-to-end checks)
+zig build-exe -O ReleaseSafe -lc -fstrip -femit-bin=zig-out/bin/dhall-lsp zig/src/lsp.zig
+bash tests/lsp.sh zig-out/bin/dhall-lsp   # 6 end-to-end checks
 ```
 
-Point your editor's LSP client at the `.dbg` binary (plain static ELF, no APE
-loader needed) with the `dhall` filetype, e.g. for Neovim's `vim.lsp.start`:
+Point your editor's LSP client at the Zig binary with the `dhall` filetype, e.g.
+for Neovim's `vim.lsp.start`:
 
 ```lua
 vim.api.nvim_create_autocmd("FileType", {
@@ -122,7 +110,7 @@ vim.api.nvim_create_autocmd("FileType", {
   callback = function()
     vim.lsp.start({
       name = "dhall-lsp",
-      cmd = { vim.fn.getcwd() .. "/dhall-lsp.com.dbg" },
+      cmd = { vim.fn.getcwd() .. "/zig-out/bin/dhall-lsp" },
     })
   end,
 })
@@ -261,7 +249,7 @@ http://host/x.dhall sha256:<64hex>
 - Import **cycles** are detected and reported (`import cycle`).
 - A per-key cache gives correct diamond-import sharing.
 - Import chain depth is capped (`MAX_IMPORT_DEPTH`, 64) — deeper chains
-  error instead of overflowing the C stack.
+  error instead of overflowing the stack.
 - Local imports also support the always-absent `missing` import.
 - `e0 ? e1` (import-fallback, tighter than `with`, looser than `||`) evaluates
   to `e1` when `e0` contains an absent import — a `missing` import, a file that
@@ -368,5 +356,5 @@ type-checks, and is idempotent). Well-typed closed interpolation still collapses
 
 The recursive-descent parser enforces a maximum nesting depth
 (`PARSE_MAX_DEPTH`, 1000) and reports a parse error rather than overflowing the
-C stack on deeply nested adversarial input. Import chains are additionally
+stack on deeply nested adversarial input. Import chains are additionally
 guarded by `MAX_IMPORT_DEPTH` (see Imports).

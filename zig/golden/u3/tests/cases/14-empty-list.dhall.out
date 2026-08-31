@@ -1,0 +1,1 @@
+(TmAnn 1:4 (TmNil 1:1) (TmApp 1:6 (TmBuiltin 1:6 List) (TmBuiltin 1:11 Natural)))

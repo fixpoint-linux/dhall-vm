@@ -1,0 +1,5 @@
+=== tests/cases/51-opt-none.dhall
+T None Natural
+SHIFT None Natural
+SUB None Natural
+AE 1 1 1

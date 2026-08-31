@@ -1,0 +1,5 @@
+=== tests/cases/24-empty-json.dhall
+T ([] : (List Natural))
+SHIFT ([] : (List Natural))
+SUB ([] : (List Natural))
+AE 1 1 1

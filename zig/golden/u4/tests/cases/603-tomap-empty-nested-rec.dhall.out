@@ -1,0 +1,5 @@
+=== tests/cases/603-tomap-empty-nested-rec.dhall
+T ((toMap {}) : (List {mapKey:Text,mapValue:{x:Natural}}))
+SHIFT ((toMap {}) : (List {mapKey:Text,mapValue:{x:Natural}}))
+SUB ((toMap {}) : (List {mapKey:Text,mapValue:{x:Natural}}))
+AE 1 1 1

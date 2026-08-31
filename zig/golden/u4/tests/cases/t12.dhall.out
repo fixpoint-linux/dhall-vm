@@ -1,0 +1,5 @@
+=== tests/cases/t12.dhall
+T {b=True,i=-7,n=42}
+SHIFT {b=True,i=-7,n=42}
+SUB {b=True,i=-7,n=42}
+AE 1 1 1

@@ -1,0 +1,10 @@
+T_NAME 1:1 assert
+T_COLON 1:8 <none>
+T_LPAREN 1:10 <none>
+T_NAT 1:11 1
+T_PLUS 1:12 <none>
+T_NAT 1:13 1
+T_EQEQ 1:14 <none>
+T_NAT 1:16 2
+T_RPAREN 1:17 <none>
+T_EOF 2:1 <none>

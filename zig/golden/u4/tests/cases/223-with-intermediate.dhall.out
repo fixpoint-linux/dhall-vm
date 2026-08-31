@@ -1,0 +1,5 @@
+=== tests/cases/223-with-intermediate.dhall
+T ({} with a.b = 1)
+SHIFT ({} with a.b = 1)
+SUB ({} with a.b = 1)
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/81-err-eq.dhall
+T (1 == "a")
+SHIFT (1 == "a")
+SUB (1 == "a")
+AE 1 1 1

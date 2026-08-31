@@ -1,0 +1,1 @@
+(TmRecordType 1:1 ((F a (TmBuiltin 1:6 Natural) 0)(F b (TmBuiltin 1:19 Bool) 0)))

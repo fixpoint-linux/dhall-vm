@@ -1,0 +1,5 @@
+=== tests/cases/t05.dhall
+T {a=[{x=1},{x=2}]}
+SHIFT {a=[{x=1},{x=2}]}
+SUB {a=[{x=1},{x=2}]}
+AE 1 1 1

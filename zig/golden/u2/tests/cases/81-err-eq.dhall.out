@@ -1,0 +1,6 @@
+T_NAT 1:1 1
+T_EQEQ 1:2 <none>
+T_STR_OPEN 1:4 <none>
+T_NAME 1:5 a
+T_STR_OPEN 1:6 <none>
+T_EOF 2:1 <none>

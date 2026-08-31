@@ -1,0 +1,5 @@
+=== tests/cases/949-dbl-yaml.dhall
+T {x=0.123456789,y=1e+10}
+SHIFT {x=0.123456789,y=1e+10}
+SUB {x=0.123456789,y=1e+10}
+AE 1 1 1

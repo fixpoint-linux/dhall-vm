@@ -1,0 +1,5 @@
+=== tests/cases/y07.dhall
+T {s="a\"b",t="true",u="123",v="yes"}
+SHIFT {s="a\"b",t="true",u="123",v="yes"}
+SUB {s="a\"b",t="true",u="123",v="yes"}
+AE 1 1 1

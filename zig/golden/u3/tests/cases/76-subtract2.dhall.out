@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmApp 1:1 (TmBuiltin 1:1 Natural/subtract) (TmConst 1:18 C_NAT 5)) (TmConst 1:20 C_NAT 3))

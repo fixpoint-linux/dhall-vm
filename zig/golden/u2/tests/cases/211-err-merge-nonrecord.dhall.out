@@ -1,0 +1,8 @@
+T_NAT 1:1 1
+T_MERGE 1:2 <none>
+T_LBRACE 1:4 <none>
+T_NAME 1:5 a
+T_EQUALS 1:6 <none>
+T_NAT 1:7 1
+T_RBRACE 1:8 <none>
+T_EOF 2:1 <none>

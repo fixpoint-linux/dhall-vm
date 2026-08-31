@@ -1,0 +1,5 @@
+=== tests/cases/16-double.dhall
+T 2.5
+SHIFT 2.5
+SUB 2.5
+AE 1 1 1

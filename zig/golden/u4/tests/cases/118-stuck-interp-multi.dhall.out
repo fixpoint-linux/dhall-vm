@@ -1,0 +1,5 @@
+=== tests/cases/118-stuck-interp-multi.dhall
+T \(_ : Text) -> \(_ : Text) -> "a${_1}b${_0}c"
+SHIFT \(_ : Text) -> \(_ : Text) -> "a${_1}b${_0}c"
+SUB \(_ : Text) -> \(_ : Text) -> "a${_1}b${_0}c"
+AE 1 1 1

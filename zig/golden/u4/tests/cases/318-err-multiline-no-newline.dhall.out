@@ -1,0 +1,2 @@
+=== tests/cases/318-err-multiline-no-newline.dhall
+ERROR 2 1:1 multiline string must begin with a newline after ''

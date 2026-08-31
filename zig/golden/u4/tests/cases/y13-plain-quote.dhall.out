@@ -1,0 +1,5 @@
+=== tests/cases/y13-plain-quote.dhall
+T {a="foo:",b="0o10"}
+SHIFT {a="foo:",b="0o10"}
+SUB {a="foo:",b="0o10"}
+AE 1 1 1

@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F foo/bar 0 (TmRecordLit 1:10 ((F x 0 (TmConst 1:13 C_NAT 1)))))))

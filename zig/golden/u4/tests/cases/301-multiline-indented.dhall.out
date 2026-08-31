@@ -1,0 +1,5 @@
+=== tests/cases/301-multiline-indented.dhall
+T "ABC\nDEF\n"
+SHIFT "ABC\nDEF\n"
+SUB "ABC\nDEF\n"
+AE 1 1 1

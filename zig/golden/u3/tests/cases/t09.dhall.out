@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F s 0 (TmText 1:4 (lit "a\"b\nc")))))

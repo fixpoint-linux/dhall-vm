@@ -1,0 +1,5 @@
+=== tests/cases/t09.dhall
+T {s="a\"b\nc"}
+SHIFT {s="a\"b\nc"}
+SUB {s="a\"b\nc"}
+AE 1 1 1

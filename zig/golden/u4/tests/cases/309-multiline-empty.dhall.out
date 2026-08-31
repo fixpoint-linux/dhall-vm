@@ -1,0 +1,5 @@
+=== tests/cases/309-multiline-empty.dhall
+T ""
+SHIFT ""
+SUB ""
+AE 1 1 1

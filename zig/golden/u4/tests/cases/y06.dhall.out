@@ -1,0 +1,5 @@
+=== tests/cases/y06.dhall
+T {}
+SHIFT {}
+SUB {}
+AE 1 1 1

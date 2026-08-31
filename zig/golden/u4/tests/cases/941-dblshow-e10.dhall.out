@@ -1,0 +1,5 @@
+=== tests/cases/941-dblshow-e10.dhall
+T (Double/show 1e+10)
+SHIFT (Double/show 1e+10)
+SUB (Double/show 1e+10)
+AE 1 1 1

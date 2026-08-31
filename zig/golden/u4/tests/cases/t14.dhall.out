@@ -1,0 +1,5 @@
+=== tests/cases/t14.dhall
+T {x=Some 5}
+SHIFT {x=Some 5}
+SUB {x=Some 5}
+AE 1 1 1

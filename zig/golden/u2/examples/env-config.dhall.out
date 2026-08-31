@@ -1,0 +1,15 @@
+T_LBRACE 11:1 <none>
+T_NAME 12:3 home
+T_EQUALS 12:8 <none>
+T_IMPORT 12:10 env:HOME
+T_COMMA 12:18 <none>
+T_NAME 13:3 note
+T_EQUALS 13:8 <none>
+T_STR_OPEN 13:10 <none>
+T_NAME 13:11 resolved
+T_NAME 13:20 at
+T_NAME 13:23 load
+T_NAME 13:28 time
+T_STR_OPEN 13:32 <none>
+T_RBRACE 14:1 <none>
+T_EOF 15:1 <none>

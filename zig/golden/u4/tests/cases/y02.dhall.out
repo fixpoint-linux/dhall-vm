@@ -1,0 +1,5 @@
+=== tests/cases/y02.dhall
+T {a={b=2},x=1,y=3}
+SHIFT {a={b=2},x=1,y=3}
+SUB {a={b=2},x=1,y=3}
+AE 1 1 1

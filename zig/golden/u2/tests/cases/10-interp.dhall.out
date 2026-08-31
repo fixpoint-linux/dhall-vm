@@ -1,0 +1,10 @@
+T_STR_OPEN 1:1 <none>
+T_NAME 1:2 hello
+T_ERROR 1:8 unexpected character '$'
+T_LBRACE 1:9 <none>
+T_STR_OPEN 1:10 <none>
+T_NAME 1:11 world
+T_STR_OPEN 1:16 <none>
+T_RBRACE 1:17 <none>
+T_STR_OPEN 1:18 <none>
+T_EOF 2:1 <none>

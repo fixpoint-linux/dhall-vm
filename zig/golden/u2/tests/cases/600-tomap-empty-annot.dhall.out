@@ -1,0 +1,16 @@
+T_NAME 1:1 toMap
+T_LBRACE 1:7 <none>
+T_EQUALS 1:8 <none>
+T_RBRACE 1:9 <none>
+T_COLON 1:11 <none>
+T_NAME 1:13 List
+T_LBRACE 1:18 <none>
+T_NAME 1:20 mapKey
+T_COLON 1:27 <none>
+T_NAME 1:29 Text
+T_COMMA 1:33 <none>
+T_NAME 1:35 mapValue
+T_COLON 1:44 <none>
+T_NAME 1:46 Natural
+T_RBRACE 1:54 <none>
+T_EOF 2:1 <none>

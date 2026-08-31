@@ -1,0 +1,5 @@
+=== tests/cases/538-list-head-nil.dhall
+T ((List/head Natural) ([] : (List Natural)))
+SHIFT ((List/head Natural) ([] : (List Natural)))
+SUB ((List/head Natural) ([] : (List Natural)))
+AE 1 1 1

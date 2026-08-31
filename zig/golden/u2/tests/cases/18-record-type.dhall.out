@@ -1,0 +1,10 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 a
+T_COLON 1:4 <none>
+T_NAME 1:6 Natural
+T_COMMA 1:13 <none>
+T_NAME 1:15 b
+T_COLON 1:17 <none>
+T_NAME 1:19 Bool
+T_RBRACE 1:23 <none>
+T_EOF 2:1 <none>

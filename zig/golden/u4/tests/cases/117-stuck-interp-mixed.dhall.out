@@ -1,0 +1,5 @@
+=== tests/cases/117-stuck-interp-mixed.dhall
+T \(_ : Text) -> "a${_0}b"
+SHIFT \(_ : Text) -> "a${_0}b"
+SUB \(_ : Text) -> "a${_0}b"
+AE 1 1 1

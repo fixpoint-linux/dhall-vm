@@ -1,0 +1,5 @@
+=== tests/cases/225-with-typechange.dhall
+T (let = "hi" in ({a=1} with a = _0))
+SHIFT (let = "hi" in ({a=1} with a = _0))
+SUB (let = "hi" in ({a=1} with a = _0))
+AE 1 1 1

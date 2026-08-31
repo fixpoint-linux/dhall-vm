@@ -1,0 +1,5 @@
+=== tests/cases/412-nat-odd.dhall
+T (Natural/odd 18446744073709551617)
+SHIFT (Natural/odd 18446744073709551617)
+SUB (Natural/odd 18446744073709551617)
+AE 1 1 1

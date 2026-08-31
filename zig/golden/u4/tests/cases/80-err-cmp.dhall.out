@@ -1,0 +1,5 @@
+=== tests/cases/80-err-cmp.dhall
+T (1 < True)
+SHIFT (1 < True)
+SUB (1 < True)
+AE 1 1 1

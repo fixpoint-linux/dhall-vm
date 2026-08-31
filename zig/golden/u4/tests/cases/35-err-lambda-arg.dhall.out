@@ -1,0 +1,5 @@
+=== tests/cases/35-err-lambda-arg.dhall
+T (\(_ : Natural) -> _0 True)
+SHIFT (\(_ : Natural) -> _0 True)
+SUB (\(_ : Natural) -> _0 True)
+AE 1 1 1

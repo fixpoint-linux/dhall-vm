@@ -1,0 +1,5 @@
+=== tests/cases/220-with-update.dhall
+T ({a=1,b=True} with a = 2)
+SHIFT ({a=1,b=True} with a = 2)
+SUB ({a=1,b=True} with a = 2)
+AE 1 1 1

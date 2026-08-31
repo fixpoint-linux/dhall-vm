@@ -1,0 +1,5 @@
+=== tests/cases/523-prefer-precedence.dhall
+T (({a={x=1}} // {b={y=2}}) /\ {a={z=3}})
+SHIFT (({a={x=1}} // {b={y=2}}) /\ {a={z=3}})
+SUB (({a={x=1}} // {b={y=2}}) /\ {a={z=3}})
+AE 1 1 1

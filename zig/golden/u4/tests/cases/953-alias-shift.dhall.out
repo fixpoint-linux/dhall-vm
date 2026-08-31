@@ -1,0 +1,5 @@
+=== tests/cases/953-alias-shift.dhall
+T (let = Natural in (let = _0 in (let = 1 in _0)))
+SHIFT (let = Natural in (let = _0 in (let = 1 in _0)))
+SUB (let = Natural in (let = _0 in (let = 1 in _0)))
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/410-nat-show.dhall
+T (Natural/show 18446744073709551616)
+SHIFT (Natural/show 18446744073709551616)
+SUB (Natural/show 18446744073709551616)
+AE 1 1 1

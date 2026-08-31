@@ -1,0 +1,5 @@
+T_NAME 1:1 Text/show
+T_STR_OPEN 1:11 <none>
+T_ERROR 1:12 unexpected character '$'
+T_STR_OPEN 1:13 <none>
+T_EOF 2:1 <none>

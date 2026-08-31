@@ -1,0 +1,5 @@
+=== tests/cases/23-text-json.dhall
+T "hi"
+SHIFT "hi"
+SUB "hi"
+AE 1 1 1

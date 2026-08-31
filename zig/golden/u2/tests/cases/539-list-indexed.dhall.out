@@ -1,0 +1,8 @@
+T_NAME 1:1 List/indexed
+T_NAME 1:14 Natural
+T_LBRACKET 1:22 <none>
+T_NAT 1:23 10
+T_COMMA 1:25 <none>
+T_NAT 1:26 20
+T_RBRACKET 1:28 <none>
+T_EOF 2:1 <none>

@@ -1,0 +1,1 @@
+(TmCons 1:1 (TmRecordLit 1:2 ((F name 0 (TmText 1:8 (lit "a")))(F value 0 (TmConst 1:18 C_NAT 1)))) (TmCons 1:21 (TmRecordLit 1:21 ((F name 0 (TmText 1:27 (lit "b")))(F value 0 (TmConst 1:37 C_NAT 2)))) (TmNil 0:0)))

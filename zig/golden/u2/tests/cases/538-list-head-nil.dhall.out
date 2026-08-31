@@ -1,0 +1,10 @@
+T_NAME 1:1 List/head
+T_NAME 1:11 Natural
+T_LPAREN 1:19 <none>
+T_LBRACKET 1:20 <none>
+T_RBRACKET 1:21 <none>
+T_COLON 1:23 <none>
+T_NAME 1:25 List
+T_NAME 1:30 Natural
+T_RPAREN 1:37 <none>
+T_EOF 2:1 <none>

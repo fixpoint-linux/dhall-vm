@@ -1,0 +1,5 @@
+=== tests/cases/304-multiline-mixed-indent.dhall
+T "    ABC\n  DEF\n"
+SHIFT "    ABC\n  DEF\n"
+SUB "    ABC\n  DEF\n"
+AE 1 1 1

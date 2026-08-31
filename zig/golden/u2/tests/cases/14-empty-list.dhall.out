@@ -1,0 +1,6 @@
+T_LBRACKET 1:1 <none>
+T_RBRACKET 1:2 <none>
+T_COLON 1:4 <none>
+T_NAME 1:6 List
+T_NAME 1:11 Natural
+T_EOF 2:1 <none>

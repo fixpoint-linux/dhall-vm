@@ -1,0 +1,14 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 n
+T_EQUALS 1:3 <none>
+T_NAT 1:4 42
+T_COMMA 1:6 <none>
+T_NAME 1:7 b
+T_EQUALS 1:8 <none>
+T_NAME 1:9 True
+T_COMMA 1:13 <none>
+T_NAME 1:14 i
+T_EQUALS 1:15 <none>
+T_INT 1:16 -7
+T_RBRACE 1:18 <none>
+T_EOF 2:1 <none>

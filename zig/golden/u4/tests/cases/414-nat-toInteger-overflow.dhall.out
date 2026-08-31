@@ -1,0 +1,5 @@
+=== tests/cases/414-nat-toInteger-overflow.dhall
+T (Natural/toInteger 18446744073709551616)
+SHIFT (Natural/toInteger 18446744073709551616)
+SUB (Natural/toInteger 18446744073709551616)
+AE 1 1 1

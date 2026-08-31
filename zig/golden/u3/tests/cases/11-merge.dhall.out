@@ -1,0 +1,1 @@
+(TmMerge 1:1 (TmRecordLit 1:7 ((F A 0 (TmLam 1:10 (TmBuiltin 1:14 Natural) (TmVar 1:24 0)))(F B 0 (TmLam 1:29 (TmBuiltin 1:33 Bool) (TmConst 1:40 C_NAT 0))))) (TmUnionLit 1:44 ((F A 0 (TmConst 1:47 C_NAT 5))(F B (TmBuiltin 1:51 Bool) 0))))

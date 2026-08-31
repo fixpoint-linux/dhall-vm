@@ -1,0 +1,7 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 x
+T_EQUALS 1:3 <none>
+T_NAME 1:4 Some
+T_NAT 1:9 5
+T_RBRACE 1:10 <none>
+T_EOF 2:1 <none>

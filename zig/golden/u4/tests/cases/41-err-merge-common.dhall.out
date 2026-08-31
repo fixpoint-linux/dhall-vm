@@ -1,0 +1,5 @@
+=== tests/cases/41-err-merge-common.dhall
+T (merge {A=\(_ : Natural) -> _0,B=\(_ : Bool) -> True} <A = 5|B:Bool>)
+SHIFT (merge {A=\(_ : Natural) -> _0,B=\(_ : Bool) -> True} <A = 5|B:Bool>)
+SUB (merge {A=\(_ : Natural) -> _0,B=\(_ : Bool) -> True} <A = 5|B:Bool>)
+AE 1 1 1

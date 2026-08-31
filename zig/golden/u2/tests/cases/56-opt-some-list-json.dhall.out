@@ -1,0 +1,9 @@
+T_NAME 1:1 Some
+T_LBRACKET 1:6 <none>
+T_NAT 1:7 1
+T_COMMA 1:8 <none>
+T_NAT 1:9 2
+T_COMMA 1:10 <none>
+T_NAT 1:11 3
+T_RBRACKET 1:12 <none>
+T_EOF 2:1 <none>

@@ -1,0 +1,7 @@
+T_NAME 1:1 Double/show
+T_LPAREN 1:13 <none>
+T_DBL 1:14 3fb999999999999a
+T_PLUS 1:18 <none>
+T_DBL 1:20 3fc999999999999a
+T_RPAREN 1:23 <none>
+T_EOF 2:1 <none>

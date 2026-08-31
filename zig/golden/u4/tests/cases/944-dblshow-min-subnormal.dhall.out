@@ -1,0 +1,5 @@
+=== tests/cases/944-dblshow-min-subnormal.dhall
+T (Double/show 5e-324)
+SHIFT (Double/show 5e-324)
+SUB (Double/show 5e-324)
+AE 1 1 1

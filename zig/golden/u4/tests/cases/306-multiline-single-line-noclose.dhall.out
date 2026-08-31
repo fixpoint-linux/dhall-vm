@@ -1,0 +1,5 @@
+=== tests/cases/306-multiline-single-line-noclose.dhall
+T "ABC"
+SHIFT "ABC"
+SUB "ABC"
+AE 1 1 1

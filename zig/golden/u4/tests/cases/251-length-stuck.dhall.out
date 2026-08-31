@@ -1,0 +1,5 @@
+=== tests/cases/251-length-stuck.dhall
+T \(_ : (List Natural)) -> ((List/length Natural) _0)
+SHIFT \(_ : (List Natural)) -> ((List/length Natural) _0)
+SUB \(_ : (List Natural)) -> ((List/length Natural) _0)
+AE 1 1 1

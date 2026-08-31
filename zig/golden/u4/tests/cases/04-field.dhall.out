@@ -1,0 +1,5 @@
+=== tests/cases/04-field.dhall
+T {a=1,b=True}.a
+SHIFT {a=1,b=True}.a
+SUB {a=1,b=True}.a
+AE 1 1 1

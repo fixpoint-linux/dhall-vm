@@ -1,0 +1,5 @@
+=== tests/cases/952-err-union-value.dhall
+T (let = <A:Natural|B:Text> in (let = [<A = "not-a-nat">] in _0))
+SHIFT (let = <A:Natural|B:Text> in (let = [<A = "not-a-nat">] in _0))
+SUB (let = <A:Natural|B:Text> in (let = [<A = "not-a-nat">] in _0))
+AE 1 1 1

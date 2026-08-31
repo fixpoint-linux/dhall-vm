@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# u2_lexer_diff.sh — U2 token-dump twin-driver gate.
+# u2_lexer_diff.sh — U2 token-dump golden gate.
 #
-# Builds the C twin driver (a tiny main over src/lexer.c + the C engine) and
-# the Zig twin driver (over zig/src/lexer.zig), then for every fixture in the
-# corpora runs both and asserts byte-identical token streams:
+# Builds the Zig twin driver (a tiny main over zig/src/lexer.zig) and for every
+# fixture in the corpora asserts its token stream matches the recorded golden
+# baseline in zig/golden/u2/:
 #     <TOKTYPE> <line>:<col> <text>
+# The Zig port is the trusted implementation (byte-verified against the removed
+# C oracle by the u2 differential before removal). RECORD_GOLDEN=1 regenerates
+# the baselines; the corpora are fixed and the dump is deterministic, so the
+# baselines are stable.
+#
 # Corpora: tests/cases/*.dhall, tests/cases/imports/**/*.dhall, examples/*.dhall.
 # (vendor/dhall-lang is not checked out in this tree; if it is present later,
 # add a loop below.)
@@ -15,53 +20,63 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ZIGOUT="$REPO_ROOT/zig-out"
-mkdir -p "$ZIGOUT"
+GOLDEN="$SCRIPT_DIR/golden/u2"
+mkdir -p "$ZIGOUT" "$GOLDEN"
 
 # ─── Zig cache dirs (sandbox) ───────────────────────────────────────────────
 if [ -z "${ZIG_GLOBAL_CACHE_DIR:-}" ]; then export ZIG_GLOBAL_CACHE_DIR=/tmp/.zcache; fi
 if [ -z "${ZIG_LOCAL_CACHE_DIR:-}" ];  then export ZIG_LOCAL_CACHE_DIR=/tmp/.zlcache;  fi
 mkdir -p "$ZIG_GLOBAL_CACHE_DIR" "$ZIG_LOCAL_CACHE_DIR"
 
-# ─── Build both twin drivers ────────────────────────────────────────────────
-echo "building C twin driver..."
-gcc -O2 -I "$REPO_ROOT/src" -o "$ZIGOUT/u2_c_tok" \
-    "$REPO_ROOT/src/arena.c" "$REPO_ROOT/src/bignum.c" "$REPO_ROOT/src/ast.c" \
-    "$REPO_ROOT/src/builtins.c" "$REPO_ROOT/src/lexer.c" \
-    "$SCRIPT_DIR/u2_token_dump.c" -lm
+# ─── Build the Zig twin driver ──────────────────────────────────────────────
 echo "building Zig twin driver..."
 zig build-exe -O ReleaseSafe -lc \
     -femit-bin="$ZIGOUT/u2_z_tok" "$SCRIPT_DIR/src/token_dump.zig"
 
-C_OUT=$(mktemp); Z_OUT=$(mktemp)
-trap 'rm -f "$C_OUT" "$Z_OUT"' EXIT
+OUT=$(mktemp)
+trap 'rm -f "$OUT"' EXIT
 
 PASS=0; FAIL=0
 
-diff_tokens() {
-  local f="$1"
-  "$ZIGOUT/u2_c_tok" "$f" > "$C_OUT"
-  "$ZIGOUT/u2_z_tok" "$f" > "$Z_OUT"
-  if cmp -s "$C_OUT" "$Z_OUT"; then
+# check_one <relpath> — run the driver with cwd = repo root and the fixture's
+# repo-relative path, then byte-compare stdout against zig/golden/u2/<relpath>.out
+# (recording that golden first when RECORD_GOLDEN=1).
+check_one() {
+  local rel="$1"
+  "$ZIGOUT/u2_z_tok" "$rel" > "$OUT"
+  local golden="$GOLDEN/$rel.out"
+  if [ "${RECORD_GOLDEN:-0}" = "1" ]; then
+    mkdir -p "$(dirname "$golden")"
+    cp "$OUT" "$golden"
+    echo "recorded $rel"
+    PASS=$((PASS + 1))
+    return
+  fi
+  if cmp -s "$OUT" "$golden"; then
     PASS=$((PASS + 1))
   else
     FAIL=$((FAIL + 1))
-    echo "FAIL: $f"
-    diff "$C_OUT" "$Z_OUT" | head -20 | sed 's/^/    /'
+    echo "FAIL: $rel"
+    diff "$golden" "$OUT" | head -20 | sed 's/^/    /'
   fi
 }
 
-# ─── stdin-mode fixtures: tests/cases/*.dhall ───────────────────────────────
-while IFS= read -r f; do diff_tokens "$f"; done < <(find "$REPO_ROOT/tests/cases" -maxdepth 1 -name '*.dhall' -print | sort)
+# Run every corpus with cwd = repo root and relative paths, so golden baselines
+# are machine-independent (no absolute paths leak into the dump).
+cd "$REPO_ROOT"
 
-# ─── file-mode fixtures: tests/cases/imports/**/*.dhall ─────────────────────
-while IFS= read -r f; do diff_tokens "$f"; done < <(find "$REPO_ROOT/tests/cases/imports" -name '*.dhall' -print | sort)
+# ─── tests/cases/*.dhall ────────────────────────────────────────────────────
+while IFS= read -r f; do check_one "$f"; done < <(find tests/cases -maxdepth 1 -name '*.dhall' -print | sort)
 
-# ─── file-mode fixtures: examples/*.dhall ───────────────────────────────────
-while IFS= read -r f; do diff_tokens "$f"; done < <(find "$REPO_ROOT/examples" -maxdepth 1 -name '*.dhall' -print | sort)
+# ─── tests/cases/imports/**/*.dhall ─────────────────────────────────────────
+while IFS= read -r f; do check_one "$f"; done < <(find tests/cases/imports -name '*.dhall' -print | sort)
+
+# ─── examples/*.dhall ───────────────────────────────────────────────────────
+while IFS= read -r f; do check_one "$f"; done < <(find examples -maxdepth 1 -name '*.dhall' -print | sort)
 
 # ─── dhall-lang corpus (if vendored) ────────────────────────────────────────
-if [ -d "$REPO_ROOT/vendor/dhall-lang/tests" ]; then
-  while IFS= read -r f; do diff_tokens "$f"; done < <(find "$REPO_ROOT/vendor/dhall-lang/tests" -name '*.dhall' -print | sort)
+if [ -d vendor/dhall-lang/tests ]; then
+  while IFS= read -r f; do check_one "$f"; done < <(find vendor/dhall-lang/tests -name '*.dhall' -print | sort)
 fi
 
 echo

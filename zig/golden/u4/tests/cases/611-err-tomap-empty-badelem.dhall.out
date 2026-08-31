@@ -1,0 +1,5 @@
+=== tests/cases/611-err-tomap-empty-badelem.dhall
+T ((toMap {}) : (List Natural))
+SHIFT ((toMap {}) : (List Natural))
+SUB ((toMap {}) : (List Natural))
+AE 1 1 1

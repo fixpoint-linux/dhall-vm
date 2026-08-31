@@ -1,0 +1,5 @@
+=== tests/cases/67-cmp-lt.dhall
+T (1 < 2)
+SHIFT (1 < 2)
+SUB (1 < 2)
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/313-multiline-backslash-literal.dhall
+T "\\path\\to\\file\n"
+SHIFT "\\path\\to\\file\n"
+SUB "\\path\\to\\file\n"
+AE 1 1 1

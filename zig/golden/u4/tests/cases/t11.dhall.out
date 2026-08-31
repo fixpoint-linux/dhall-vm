@@ -1,0 +1,5 @@
+=== tests/cases/t11.dhall
+T {f=1.0,g=0.5}
+SHIFT {f=1.0,g=0.5}
+SUB {f=1.0,g=0.5}
+AE 1 1 1

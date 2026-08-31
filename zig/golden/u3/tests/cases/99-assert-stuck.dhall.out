@@ -1,0 +1,1 @@
+(TmAssert 1:1 (TmLam 1:11 (TmBuiltin 1:17 Bool) (TmVar 1:26 0)))

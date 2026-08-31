@@ -1,0 +1,5 @@
+=== tests/cases/243-builtin-toDouble.dhall
+T (Integer/toDouble 3)
+SHIFT (Integer/toDouble 3)
+SUB (Integer/toDouble 3)
+AE 1 1 1

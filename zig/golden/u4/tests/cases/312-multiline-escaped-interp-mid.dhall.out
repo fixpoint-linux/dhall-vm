@@ -1,0 +1,5 @@
+=== tests/cases/312-multiline-escaped-interp-mid.dhall
+T "foo\${bar}\n"
+SHIFT "foo\${bar}\n"
+SUB "foo\${bar}\n"
+AE 1 1 1

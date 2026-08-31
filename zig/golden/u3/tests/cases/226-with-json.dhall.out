@@ -1,0 +1,1 @@
+(TmWith 1:15 (TmRecordLit 1:1 ((F a 0 (TmConst 1:4 C_NAT 1))(F b 0 (TmRecordLit 1:8 ((F x 0 (TmConst 1:11 C_NAT 1))))))) (b y) (TmConst 1:24 C_NAT 2))

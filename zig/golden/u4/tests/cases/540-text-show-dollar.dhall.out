@@ -1,0 +1,5 @@
+=== tests/cases/540-text-show-dollar.dhall
+T (Text/show "\$")
+SHIFT (Text/show "\$")
+SUB (Text/show "\$")
+AE 1 1 1

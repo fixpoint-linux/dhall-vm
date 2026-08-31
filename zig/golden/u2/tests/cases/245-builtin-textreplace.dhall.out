@@ -1,0 +1,11 @@
+T_NAME 1:1 Text/replace
+T_STR_OPEN 1:14 <none>
+T_NAME 1:15 a
+T_STR_OPEN 1:16 <none>
+T_STR_OPEN 1:18 <none>
+T_NAME 1:19 b
+T_STR_OPEN 1:20 <none>
+T_STR_OPEN 1:22 <none>
+T_NAME 1:23 banana
+T_STR_OPEN 1:29 <none>
+T_EOF 2:1 <none>

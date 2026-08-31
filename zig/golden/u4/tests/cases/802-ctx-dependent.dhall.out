@@ -1,0 +1,5 @@
+=== tests/cases/802-ctx-dependent.dhall
+T \(_ : Type) -> \(_ : forall (_ : Natural) -> forall (_ : _1) -> _2) -> \(_ : _1) -> ((_1 2) _0)
+SHIFT \(_ : Type) -> \(_ : forall (_ : Natural) -> forall (_ : _1) -> _2) -> \(_ : _1) -> ((_1 2) _0)
+SUB \(_ : Type) -> \(_ : forall (_ : Natural) -> forall (_ : _1) -> _2) -> \(_ : _1) -> ((_1 2) _0)
+AE 1 1 1

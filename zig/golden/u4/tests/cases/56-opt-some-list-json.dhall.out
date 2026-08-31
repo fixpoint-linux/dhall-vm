@@ -1,0 +1,5 @@
+=== tests/cases/56-opt-some-list-json.dhall
+T Some [1,2,3]
+SHIFT Some [1,2,3]
+SUB Some [1,2,3]
+AE 1 1 1

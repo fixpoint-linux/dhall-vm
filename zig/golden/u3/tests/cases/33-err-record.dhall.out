@@ -1,0 +1,1 @@
+(TmAnn 1:6 (TmRecordLit 1:1 ((F a 0 (TmConst 1:4 C_NAT 1)))) (TmRecordType 1:7 ((F a (TmBuiltin 1:10 Bool) 0))))

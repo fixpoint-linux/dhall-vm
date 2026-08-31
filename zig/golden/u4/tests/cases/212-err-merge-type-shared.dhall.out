@@ -1,0 +1,5 @@
+=== tests/cases/212-err-merge-type-shared.dhall
+T ({a:Natural} /\ {a:Bool})
+SHIFT ({a:Natural} /\ {a:Bool})
+SUB ({a:Natural} /\ {a:Bool})
+AE 1 1 1

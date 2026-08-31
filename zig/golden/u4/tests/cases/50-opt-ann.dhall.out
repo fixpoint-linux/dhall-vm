@@ -1,0 +1,5 @@
+=== tests/cases/50-opt-ann.dhall
+T (Some 1 : (Optional Natural))
+SHIFT (Some 1 : (Optional Natural))
+SUB (Some 1 : (Optional Natural))
+AE 1 1 1

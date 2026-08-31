@@ -1,0 +1,7 @@
+T_NAME 1:1 let
+T_NAME 1:5 x
+T_EQUALS 1:7 <none>
+T_NAT 1:9 1
+T_NAME 1:11 in
+T_NAME 1:14 x
+T_EOF 2:1 <none>

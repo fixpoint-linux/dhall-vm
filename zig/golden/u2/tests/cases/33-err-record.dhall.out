@@ -1,0 +1,12 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 a
+T_EQUALS 1:3 <none>
+T_NAT 1:4 1
+T_RBRACE 1:5 <none>
+T_COLON 1:6 <none>
+T_LBRACE 1:7 <none>
+T_NAME 1:8 a
+T_COLON 1:9 <none>
+T_NAME 1:10 Bool
+T_RBRACE 1:14 <none>
+T_EOF 2:1 <none>

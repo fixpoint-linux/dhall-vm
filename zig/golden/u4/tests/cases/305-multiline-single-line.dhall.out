@@ -1,0 +1,5 @@
+=== tests/cases/305-multiline-single-line.dhall
+T "ABC\n"
+SHIFT "ABC\n"
+SUB "ABC\n"
+AE 1 1 1

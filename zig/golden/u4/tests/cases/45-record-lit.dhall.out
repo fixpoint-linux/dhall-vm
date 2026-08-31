@@ -1,0 +1,5 @@
+=== tests/cases/45-record-lit.dhall
+T {a=1}
+SHIFT {a=1}
+SUB {a=1}
+AE 1 1 1

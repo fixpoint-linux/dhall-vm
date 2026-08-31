@@ -1,0 +1,5 @@
+=== tests/cases/222-with-insert.dhall
+T ({a=1} with b = True)
+SHIFT ({a=1} with b = True)
+SUB ({a=1} with b = True)
+AE 1 1 1

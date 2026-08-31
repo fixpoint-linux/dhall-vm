@@ -1,0 +1,4 @@
+T_INT 1:1 -5
+T_PLUS 1:4 <none>
+T_INT 1:6 3
+T_EOF 2:1 <none>

@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmBuiltin 1:1 Text/show) (TmText 1:11 (lit "a\n")))

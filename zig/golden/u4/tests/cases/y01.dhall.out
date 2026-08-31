@@ -1,0 +1,5 @@
+=== tests/cases/y01.dhall
+T {a=1,b=[True,False],c="x"}
+SHIFT {a=1,b=[True,False],c="x"}
+SUB {a=1,b=[True,False],c="x"}
+AE 1 1 1

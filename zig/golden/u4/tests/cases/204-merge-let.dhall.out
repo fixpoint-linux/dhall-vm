@@ -1,0 +1,5 @@
+=== tests/cases/204-merge-let.dhall
+T (let = {x=1} in ({a=_0} /\ {a={y=2}}))
+SHIFT (let = {x=1} in ({a=_0} /\ {a={y=2}}))
+SUB (let = {x=1} in ({a=_0} /\ {a={y=2}}))
+AE 1 1 1

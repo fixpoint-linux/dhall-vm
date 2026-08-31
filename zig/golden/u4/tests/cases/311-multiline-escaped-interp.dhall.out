@@ -1,0 +1,5 @@
+=== tests/cases/311-multiline-escaped-interp.dhall
+T "\${x}\n"
+SHIFT "\${x}\n"
+SUB "\${x}\n"
+AE 1 1 1

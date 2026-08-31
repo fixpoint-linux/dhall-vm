@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F a 0 (TmAnn 1:7 (TmNil 1:4) (TmApp 1:9 (TmBuiltin 1:9 List) (TmBuiltin 1:14 Natural))))(F b 0 (TmRecordLit 1:25 ()))))

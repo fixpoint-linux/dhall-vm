@@ -1,0 +1,5 @@
+=== tests/cases/57-err-opt-some.dhall
+T (Some 1 : (Optional Bool))
+SHIFT (Some 1 : (Optional Bool))
+SUB (Some 1 : (Optional Bool))
+AE 1 1 1

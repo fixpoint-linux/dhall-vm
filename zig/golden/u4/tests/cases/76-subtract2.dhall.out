@@ -1,0 +1,5 @@
+=== tests/cases/76-subtract2.dhall
+T ((Natural/subtract 5) 3)
+SHIFT ((Natural/subtract 5) 3)
+SUB ((Natural/subtract 5) 3)
+AE 1 1 1

@@ -1,0 +1,2 @@
+=== tests/cases/imports/605-fallback-first.dhall
+ERROR 2 1:1 imports are not available

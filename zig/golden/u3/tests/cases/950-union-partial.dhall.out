@@ -1,0 +1,1 @@
+(TmLet 1:1 0 (TmUnionType 1:14 ((F A (TmBuiltin 1:20 Natural) 0)(F B (TmBuiltin 1:34 Text) 0))) (TmLet 1:44 (TmApp 1:52 (TmBuiltin 1:52 List) (TmVar 1:57 0)) (TmCons 1:66 (TmUnionLit 1:68 ((F A 0 (TmConst 1:74 C_NAT 1)))) (TmCons 1:79 (TmUnionLit 1:79 ((F B 0 (TmText 1:85 (lit "x"))))) (TmNil 0:0))) (TmVar 1:96 0)))

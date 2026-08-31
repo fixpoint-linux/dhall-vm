@@ -1,0 +1,5 @@
+=== tests/cases/44-double-whole.dhall
+T 1.0
+SHIFT 1.0
+SUB 1.0
+AE 1 1 1

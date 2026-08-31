@@ -1,0 +1,16 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 a
+T_EQUALS 1:3 <none>
+T_STR_OPEN 1:4 <none>
+T_NAME 1:5 foo
+T_COLON 1:8 <none>
+T_STR_OPEN 1:9 <none>
+T_COMMA 1:10 <none>
+T_NAME 1:12 b
+T_EQUALS 1:13 <none>
+T_STR_OPEN 1:14 <none>
+T_NAT 1:15 0
+T_NAME 1:16 o10
+T_STR_OPEN 1:19 <none>
+T_RBRACE 1:20 <none>
+T_EOF 2:1 <none>

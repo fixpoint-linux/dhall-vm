@@ -1,0 +1,5 @@
+=== tests/cases/11-merge.dhall
+T (merge {A=\(_ : Natural) -> _0,B=\(_ : Bool) -> 0} <A = 5|B:Bool>)
+SHIFT (merge {A=\(_ : Natural) -> _0,B=\(_ : Bool) -> 0} <A = 5|B:Bool>)
+SUB (merge {A=\(_ : Natural) -> _0,B=\(_ : Bool) -> 0} <A = 5|B:Bool>)
+AE 1 1 1

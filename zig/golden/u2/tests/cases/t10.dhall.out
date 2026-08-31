@@ -1,0 +1,10 @@
+T_LBRACE 1:1 <none>
+T_NAME 1:2 true
+T_EQUALS 1:6 <none>
+T_NAT 1:7 1
+T_COMMA 1:8 <none>
+T_NAME 1:9 foo-bar
+T_EQUALS 1:16 <none>
+T_NAT 1:17 2
+T_RBRACE 1:18 <none>
+T_EOF 2:1 <none>

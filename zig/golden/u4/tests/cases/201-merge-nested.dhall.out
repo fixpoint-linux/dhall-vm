@@ -1,0 +1,5 @@
+=== tests/cases/201-merge-nested.dhall
+T ({a={x=1}} /\ {a={y=2}})
+SHIFT ({a={x=1}} /\ {a={y=2}})
+SUB ({a={x=1}} /\ {a={y=2}})
+AE 1 1 1

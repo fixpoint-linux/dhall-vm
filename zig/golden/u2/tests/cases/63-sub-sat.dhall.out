@@ -1,0 +1,4 @@
+T_NAT 1:1 2
+T_MINUS 1:2 <none>
+T_NAT 1:3 7
+T_EOF 2:1 <none>

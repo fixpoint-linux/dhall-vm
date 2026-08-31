@@ -1,0 +1,5 @@
+=== tests/cases/346-unicode-forall-apply.dhall
+T (\(_ : forall (_ : Natural) -> Natural) -> (_0 5) \(_ : Natural) -> (_0 + 1))
+SHIFT (\(_ : forall (_ : Natural) -> Natural) -> (_0 5) \(_ : Natural) -> (_0 + 1))
+SUB (\(_ : forall (_ : Natural) -> Natural) -> (_0 5) \(_ : Natural) -> (_0 + 1))
+AE 1 1 1

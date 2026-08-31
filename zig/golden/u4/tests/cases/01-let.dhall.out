@@ -1,0 +1,5 @@
+=== tests/cases/01-let.dhall
+T (let = 1 in _0)
+SHIFT (let = 1 in _0)
+SUB (let = 1 in _0)
+AE 1 1 1

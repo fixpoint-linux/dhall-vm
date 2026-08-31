@@ -1,0 +1,5 @@
+=== tests/cases/503-and-cmp-precedence.dhall
+T ((True == False) && True)
+SHIFT ((True == False) && True)
+SUB ((True == False) && True)
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/943-dblshow-max.dhall
+T (Double/show 1.7976931348623157e+308)
+SHIFT (Double/show 1.7976931348623157e+308)
+SUB (Double/show 1.7976931348623157e+308)
+AE 1 1 1

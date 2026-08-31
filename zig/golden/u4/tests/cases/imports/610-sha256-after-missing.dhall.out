@@ -1,0 +1,2 @@
+=== tests/cases/imports/610-sha256-after-missing.dhall
+ERROR 2 1:1 imports are not available

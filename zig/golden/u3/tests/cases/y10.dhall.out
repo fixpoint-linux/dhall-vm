@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F f 0 (TmConst 1:4 C_DBL 3ff0000000000000))(F g 0 (TmConst 1:10 C_DBL 3fe0000000000000))))

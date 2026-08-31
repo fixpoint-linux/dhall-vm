@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F s 0 (TmText 1:4 (lit "a\"b")))(F t 0 (TmText 1:13 (lit "true")))(F u 0 (TmText 1:22 (lit "123")))(F v 0 (TmText 1:30 (lit "yes")))))

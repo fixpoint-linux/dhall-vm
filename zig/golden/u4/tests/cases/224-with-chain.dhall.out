@@ -1,0 +1,5 @@
+=== tests/cases/224-with-chain.dhall
+T (({a=1} with b = 2) with c = 3)
+SHIFT (({a=1} with b = 2) with c = 3)
+SUB (({a=1} with b = 2) with c = 3)
+AE 1 1 1

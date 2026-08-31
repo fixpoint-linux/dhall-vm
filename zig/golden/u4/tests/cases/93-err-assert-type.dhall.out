@@ -1,0 +1,5 @@
+=== tests/cases/93-err-assert-type.dhall
+T (assert : 1)
+SHIFT (assert : 1)
+SUB (assert : 1)
+AE 1 1 1

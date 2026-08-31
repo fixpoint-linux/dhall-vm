@@ -1,0 +1,9 @@
+T_NAME 1:1 let
+T_NAME 1:5 x
+T_COLON 1:7 <none>
+T_NAME 1:9 Natural
+T_EQUALS 1:17 <none>
+T_NAT 1:19 5
+T_NAME 1:21 in
+T_NAME 1:24 x
+T_EOF 2:1 <none>

@@ -1,0 +1,5 @@
+=== tests/cases/08-fold.dhall
+T (((((List/fold Natural) [1,2,3]) Natural) \(_ : Natural) -> \(_ : Natural) -> _0) 0)
+SHIFT (((((List/fold Natural) [1,2,3]) Natural) \(_ : Natural) -> \(_ : Natural) -> _0) 0)
+SUB (((((List/fold Natural) [1,2,3]) Natural) \(_ : Natural) -> \(_ : Natural) -> _0) 0)
+AE 1 1 1

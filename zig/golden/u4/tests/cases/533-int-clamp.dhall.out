@@ -1,0 +1,5 @@
+=== tests/cases/533-int-clamp.dhall
+T (Integer/clamp -5)
+SHIFT (Integer/clamp -5)
+SUB (Integer/clamp -5)
+AE 1 1 1

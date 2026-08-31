@@ -1,0 +1,5 @@
+=== tests/cases/245-builtin-textreplace.dhall
+T (((Text/replace "a") "b") "banana")
+SHIFT (((Text/replace "a") "b") "banana")
+SUB (((Text/replace "a") "b") "banana")
+AE 1 1 1

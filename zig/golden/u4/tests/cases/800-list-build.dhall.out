@@ -1,0 +1,5 @@
+=== tests/cases/800-list-build.dhall
+T ((List/build Natural) \(_ : Type) -> \(_ : forall (_ : Natural) -> forall (_ : _1) -> _2) -> \(_ : _1) -> ((_1 1) ((_1 2) _0)))
+SHIFT ((List/build Natural) \(_ : Type) -> \(_ : forall (_ : Natural) -> forall (_ : _1) -> _2) -> \(_ : _1) -> ((_1 1) ((_1 2) _0)))
+SUB ((List/build Natural) \(_ : Type) -> \(_ : forall (_ : Natural) -> forall (_ : _1) -> _2) -> \(_ : _1) -> ((_1 1) ((_1 2) _0)))
+AE 1 1 1

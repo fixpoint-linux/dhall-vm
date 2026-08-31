@@ -1,0 +1,5 @@
+=== tests/cases/06-map.dhall
+T ((((List/map Natural) Natural) \(_ : Natural) -> _0) [1,2])
+SHIFT ((((List/map Natural) Natural) \(_ : Natural) -> _0) [1,2])
+SUB ((((List/map Natural) Natural) \(_ : Natural) -> _0) [1,2])
+AE 1 1 1

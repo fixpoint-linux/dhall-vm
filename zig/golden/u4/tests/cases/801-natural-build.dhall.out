@@ -1,0 +1,5 @@
+=== tests/cases/801-natural-build.dhall
+T (Natural/build \(_ : Type) -> \(_ : forall (_ : _0) -> _1) -> \(_ : _1) -> (_1 (_1 _0)))
+SHIFT (Natural/build \(_ : Type) -> \(_ : forall (_ : _0) -> _1) -> \(_ : _1) -> (_1 (_1 _0)))
+SUB (Natural/build \(_ : Type) -> \(_ : forall (_ : _0) -> _1) -> \(_ : _1) -> (_1 (_1 _0)))
+AE 1 1 1

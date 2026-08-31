@@ -1,0 +1,9 @@
+T_LBRACE 1:1 <none>
+T_RBRACE 1:2 <none>
+T_NAME 1:4 with
+T_NAME 1:9 a
+T_DOT 1:10 <none>
+T_NAME 1:11 b
+T_EQUALS 1:12 <none>
+T_NAT 1:13 1
+T_EOF 2:1 <none>

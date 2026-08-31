@@ -1,0 +1,11 @@
+T_NAME 1:1 toMap
+T_LBRACE 1:7 <none>
+T_NAME 1:8 a
+T_EQUALS 1:9 <none>
+T_NAT 1:10 1
+T_COMMA 1:11 <none>
+T_NAME 1:12 b
+T_EQUALS 1:13 <none>
+T_NAT 1:14 2
+T_RBRACE 1:15 <none>
+T_EOF 2:1 <none>

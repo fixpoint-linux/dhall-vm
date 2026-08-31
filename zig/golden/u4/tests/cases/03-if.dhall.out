@@ -1,0 +1,5 @@
+=== tests/cases/03-if.dhall
+T (if True then 1 else 2)
+SHIFT (if True then 1 else 2)
+SUB (if True then 1 else 2)
+AE 1 1 1

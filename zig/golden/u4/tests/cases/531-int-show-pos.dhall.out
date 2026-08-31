@@ -1,0 +1,5 @@
+=== tests/cases/531-int-show-pos.dhall
+T (Integer/show 3)
+SHIFT (Integer/show 3)
+SUB (Integer/show 3)
+AE 1 1 1

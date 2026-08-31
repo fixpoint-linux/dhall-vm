@@ -1,0 +1,1 @@
+(TmRecordLit 1:1 ((F a 0 (TmConst 1:4 C_NAT 1))(F b 0 (TmCons 1:8 (TmConst 1:9 C_BOOL True) (TmCons 1:14 (TmConst 1:14 C_BOOL False) (TmNil 0:0))))(F c 0 (TmText 1:23 (lit "x")))))

@@ -1,0 +1,5 @@
+=== tests/cases/33-err-record.dhall
+T ({a=1} : {a:Bool})
+SHIFT ({a=1} : {a:Bool})
+SUB ({a=1} : {a:Bool})
+AE 1 1 1

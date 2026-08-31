@@ -1,0 +1,5 @@
+=== tests/cases/96-err-tomap-hetero.dhall
+T (toMap {a=1,b=True})
+SHIFT (toMap {a=1,b=True})
+SUB (toMap {a=1,b=True})
+AE 1 1 1

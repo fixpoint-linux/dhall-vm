@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmBuiltin 1:1 Natural/build) (TmLam 1:16 (TmType 1:28) (TmLam 1:37 (TmPi 1:54 (TmVar 1:46 0) (TmVar 1:57 1)) (TmLam 1:69 (TmVar 1:78 1) (TmApp 1:90 (TmVar 1:90 1) (TmApp 1:96 (TmVar 1:96 1) (TmVar 1:101 0)))))))

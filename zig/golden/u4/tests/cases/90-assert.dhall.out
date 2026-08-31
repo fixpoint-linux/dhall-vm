@@ -1,0 +1,5 @@
+=== tests/cases/90-assert.dhall
+T (assert : True)
+SHIFT (assert : True)
+SUB (assert : True)
+AE 1 1 1

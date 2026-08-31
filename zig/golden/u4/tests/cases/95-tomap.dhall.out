@@ -1,0 +1,5 @@
+=== tests/cases/95-tomap.dhall
+T (toMap {a=1,b=2})
+SHIFT (toMap {a=1,b=2})
+SUB (toMap {a=1,b=2})
+AE 1 1 1

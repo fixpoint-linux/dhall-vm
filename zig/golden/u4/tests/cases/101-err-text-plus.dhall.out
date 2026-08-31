@@ -1,0 +1,5 @@
+=== tests/cases/101-err-text-plus.dhall
+T ("x" + 1)
+SHIFT ("x" + 1)
+SUB ("x" + 1)
+AE 1 1 1

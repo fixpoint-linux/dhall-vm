@@ -1,0 +1,5 @@
+=== tests/cases/38-err-merge-labels.dhall
+T (merge {A=\(_ : Natural) -> _0} <A = 1|B:Bool>)
+SHIFT (merge {A=\(_ : Natural) -> _0} <A = 1|B:Bool>)
+SUB (merge {A=\(_ : Natural) -> _0} <A = 1|B:Bool>)
+AE 1 1 1

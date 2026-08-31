@@ -1,0 +1,5 @@
+=== tests/cases/250-builtin-toInteger-overflow.dhall
+T (Natural/toInteger 18446744073709551615)
+SHIFT (Natural/toInteger 18446744073709551615)
+SUB (Natural/toInteger 18446744073709551615)
+AE 1 1 1

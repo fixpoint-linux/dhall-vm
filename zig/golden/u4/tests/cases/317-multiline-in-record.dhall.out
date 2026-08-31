@@ -1,0 +1,5 @@
+=== tests/cases/317-multiline-in-record.dhall
+T {x="foo\n"}
+SHIFT {x="foo\n"}
+SUB {x="foo\n"}
+AE 1 1 1

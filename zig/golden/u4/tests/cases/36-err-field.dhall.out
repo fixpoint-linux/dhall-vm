@@ -1,0 +1,5 @@
+=== tests/cases/36-err-field.dhall
+T {a=1}.b
+SHIFT {a=1}.b
+SUB {a=1}.b
+AE 1 1 1

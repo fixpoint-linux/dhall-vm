@@ -1,0 +1,5 @@
+=== examples/server.dhall
+T {bind={ip="0.0.0.0",port=8080},host="example.com",log_level=<DEBUG:Text|ERROR:Text|INFO = "info"|WARN:Text>,port=443,retries=3,tags=["web","api"],timeout_ms=30000,tls=True}
+SHIFT {bind={ip="0.0.0.0",port=8080},host="example.com",log_level=<DEBUG:Text|ERROR:Text|INFO = "info"|WARN:Text>,port=443,retries=3,tags=["web","api"],timeout_ms=30000,tls=True}
+SUB {bind={ip="0.0.0.0",port=8080},host="example.com",log_level=<DEBUG:Text|ERROR:Text|INFO = "info"|WARN:Text>,port=443,retries=3,tags=["web","api"],timeout_ms=30000,tls=True}
+AE 1 1 1

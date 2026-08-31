@@ -1,0 +1,28 @@
+T_LAMBDA 1:1 <none>
+T_LPAREN 1:2 <none>
+T_NAME 1:3 x
+T_COLON 1:5 <none>
+T_NAME 1:7 Text
+T_RPAREN 1:11 <none>
+T_ARROW 1:13 <none>
+T_LAMBDA 1:16 <none>
+T_LPAREN 1:17 <none>
+T_NAME 1:18 y
+T_COLON 1:20 <none>
+T_NAME 1:22 Text
+T_RPAREN 1:26 <none>
+T_ARROW 1:28 <none>
+T_STR_OPEN 1:31 <none>
+T_NAME 1:32 a
+T_ERROR 1:33 unexpected character '$'
+T_LBRACE 1:34 <none>
+T_NAME 1:35 x
+T_RBRACE 1:36 <none>
+T_NAME 1:37 b
+T_ERROR 1:38 unexpected character '$'
+T_LBRACE 1:39 <none>
+T_NAME 1:40 y
+T_RBRACE 1:41 <none>
+T_NAME 1:42 c
+T_STR_OPEN 1:43 <none>
+T_EOF 2:1 <none>

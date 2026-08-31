@@ -1,0 +1,2 @@
+=== tests/cases/imports/700-url-fallback-blocked.dhall
+ERROR 2 1:1 imports are not available

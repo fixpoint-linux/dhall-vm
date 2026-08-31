@@ -1,0 +1,5 @@
+=== tests/cases/t10.dhall
+T {foo-bar=2,true=1}
+SHIFT {foo-bar=2,true=1}
+SUB {foo-bar=2,true=1}
+AE 1 1 1

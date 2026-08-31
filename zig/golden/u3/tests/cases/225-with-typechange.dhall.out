@@ -1,0 +1,1 @@
+(TmLet 1:1 0 (TmText 1:9 (lit "hi")) (TmWith 1:23 (TmRecordLit 1:17 ((F a 0 (TmConst 1:20 C_NAT 1)))) (a) (TmVar 1:30 0)))

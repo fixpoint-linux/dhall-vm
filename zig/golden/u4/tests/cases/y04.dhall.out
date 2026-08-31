@@ -1,0 +1,5 @@
+=== tests/cases/y04.dhall
+T [{name="a",value=1},{name="b",value=2}]
+SHIFT [{name="a",value=1},{name="b",value=2}]
+SUB [{name="a",value=1},{name="b",value=2}]
+AE 1 1 1

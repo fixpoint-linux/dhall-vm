@@ -1,0 +1,5 @@
+=== tests/cases/66-precedence.dhall
+T (1 + (2 * 3))
+SHIFT (1 + (2 * 3))
+SUB (1 + (2 * 3))
+AE 1 1 1

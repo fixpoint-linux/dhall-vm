@@ -1,0 +1,4 @@
+T_NAME 1:1 assert
+T_COLON 1:8 <none>
+T_NAME 1:10 True
+T_EOF 2:1 <none>

@@ -1,0 +1,2 @@
+=== tests/cases/imports/600-missing-keyword.dhall
+ERROR 2 1:1 imports are not available

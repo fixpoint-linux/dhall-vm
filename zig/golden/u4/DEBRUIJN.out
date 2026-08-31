@@ -1,0 +1,14 @@
+=== DEBRUIJN
+A \(_ : Type) -> \(_ : Type) -> _2
+A1 \(_ : Type) -> \(_ : Type) -> _3
+A2 \(_ : Type) -> \(_ : Type) -> _4
+B (_3 _1)
+BS (_2 _9)
+C \(_ : Type) -> _0
+CS \(_ : Type) -> _0
+D \(_ : Type) -> _1
+DS \(_ : Type) -> _6
+E \(_ : Type) -> \(_ : Type) -> _1
+E1 \(_ : Type) -> \(_ : Type) -> _1
+EAE 1
+EAE2 1

@@ -1,0 +1,5 @@
+=== tests/cases/t13.dhall
+T <Left = 5|Right:Bool>
+SHIFT <Left = 5|Right:Bool>
+SUB <Left = 5|Right:Bool>
+AE 1 1 1

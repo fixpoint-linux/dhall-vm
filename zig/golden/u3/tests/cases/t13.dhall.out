@@ -1,0 +1,1 @@
+(TmUnionLit 1:1 ((F Left 0 (TmConst 1:10 C_NAT 5))(F Right (TmBuiltin 1:22 Bool) 0)))

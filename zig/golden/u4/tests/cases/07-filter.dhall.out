@@ -1,0 +1,5 @@
+=== tests/cases/07-filter.dhall
+T (((List/filter Natural) \(_ : Natural) -> True) [1,2])
+SHIFT (((List/filter Natural) \(_ : Natural) -> True) [1,2])
+SUB (((List/filter Natural) \(_ : Natural) -> True) [1,2])
+AE 1 1 1

@@ -1,0 +1,2 @@
+=== tests/cases/imports/702-url-requires-sha256.dhall
+ERROR 2 1:1 imports are not available

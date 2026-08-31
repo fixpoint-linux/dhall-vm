@@ -1,0 +1,1 @@
+(TmApp 1:1 (TmApp 1:1 (TmApp 1:1 (TmBuiltin 1:1 Text/replace) (TmText 1:14 (lit "a"))) (TmText 1:18 (lit "b"))) (TmText 1:22 (lit "banana")))

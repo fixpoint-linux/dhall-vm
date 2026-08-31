@@ -1,0 +1,8 @@
+T_STR_OPEN_MULTILINE 1:1 <none>
+T_NAME 2:1 foo''
+T_ERROR 2:6 unexpected character '$'
+T_LBRACE 2:7 <none>
+T_NAME 2:8 bar
+T_RBRACE 2:11 <none>
+T_STR_OPEN_MULTILINE 3:1 <none>
+T_EOF 4:1 <none>

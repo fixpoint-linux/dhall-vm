@@ -1,0 +1,5 @@
+=== tests/cases/113-interp-lit.dhall
+T "a${"b"}c"
+SHIFT "a${"b"}c"
+SUB "a${"b"}c"
+AE 1 1 1

@@ -1,0 +1,5 @@
+=== tests/cases/911-int-clamp-big.dhall
+T (Integer/clamp 18446744073709551616)
+SHIFT (Integer/clamp 18446744073709551616)
+SUB (Integer/clamp 18446744073709551616)
+AE 1 1 1

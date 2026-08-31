@@ -1,0 +1,1 @@
+(TmOp 1:4 OP_EQ (TmText 1:1 (lit "a")) (TmText 1:6 (lit "b")))
