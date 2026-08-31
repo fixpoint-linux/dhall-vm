@@ -229,19 +229,6 @@ in  { targets =
               }
           }
 
-        -- WebAssembly build (emscripten) for the GitHub Pages demo in docs/.
-        , { mapKey = "wasm"
-          , mapValue =
-              { deps = []
-              , phony = True
-              , recipe =
-                  [ < Shell = "./scripts/build-wasm.sh" >
-                  , < Shell = "node tests/wasm-smoke.js" >
-                  , < Shell = "node tests/lsp-wasm-smoke.js" >
-                  ]
-              }
-          }
-
         -- Full test suite: build everything, then run all the harnesses.
         , { mapKey = "test"
           , mapValue =
@@ -346,9 +333,7 @@ in  { targets =
                   , "shell/mfe/playground-element.js"
                   , "scripts/ssg.mjs"
                   , "docs/dhall.js"
-                  , "docs/dhall.wasm"
                   , "docs/dhall-lsp.js"
-                  , "docs/dhall-lsp.wasm"
                   , "docs/playground-ui.js"
                   , "docs/vendor/codemirror.min.js"
                   , "docs/vendor/codemirror.css"

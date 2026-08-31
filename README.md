@@ -87,26 +87,19 @@ internal API and tracks `dhall.h`, so an API change may require a rebuild of
 
 ### In-browser (WebAssembly) demo
 
-The interpreter is also compiled to **WebAssembly** and shipped as a static
-GitHub Pages site under `docs/` (the interpreter runs 100% client-side — your
-code never leaves the browser). Build it with:
+The GitHub Pages site (deployed by `.github/workflows/deploy.yml` on every
+push to `master`; enable once via Settings → Pages → Source → **GitHub
+Actions**) ships a playground that typechecks, normalizes, and serializes
+(JSON/TOML/YAML) Dhall expressions entirely client-side — the interpreter
+runs in the browser via a prebuilt WebAssembly build (`docs/dhall.js` +
+`docs/dhall.wasm`, likewise for the LSP), and loads the `examples/*.dhall`
+files. `dhake dist/index.html` copies these committed assets into the built
+site.
 
-```
-dhake wasm      # scripts/build-wasm.sh → docs/dhall.js + docs/dhall.wasm
-node tests/wasm-smoke.js   # headless browser-API smoke test (run by `dhake wasm`)
-node tests/wasm-fetch.js   # opt-in URL-import fetch test (needs a loopback socket)
-```
-
-`dhake wasm` needs `emscripten clang lld llvm` (on Arch: `pacman -S emscripten
-clang lld llvm`; see `scripts/build-wasm.sh` for the exact install/config
-quirks). The built `docs/dhall.js` + `docs/dhall.wasm` are committed. A GitHub
-Actions workflow (`.github/workflows/pages.yml`) deploys `docs/` to GitHub Pages
-on every push to `master`; enable it once via Settings → Pages → Source →
-**GitHub Actions** (no branch config or extra toolchain needed in CI). The site
-(`docs/index.html`) typechecks, normalizes, and serializes (JSON/TOML/YAML)
-Dhall expressions in a textarea, and loads the `examples/*.dhall` files.
-`src/wasm.c` provides the browser-callable entry point and is deliberately kept
-out of the native cosmocc build (`Dhakefile.dhall` `core`).
+The `docs/*.wasm` are prebuilt artifacts only: the emscripten build tooling
+(the `src/wasm.c` entry point, `scripts/build-wasm.sh`, and the wasm smoke
+tests) has been removed, so they cannot currently be regenerated from this
+repo.
 
 ## Language Server
 
