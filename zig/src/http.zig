@@ -297,8 +297,10 @@ fn de_chunk(in: []const u8, out: *std.ArrayList(u8)) bool {
         if (!any) return false; // empty chunk size
         p = p + eol + 2; // past the size-line CRLF
         if (sz == 0) break; // last chunk
-        if (@as(usize, sz) > end - p) return false;
-        if (out.items.len + @as(usize, sz) > HTTP_MAX_BODY) return false;
+        // sz is u64 (a chunk size is up to 16 hex digits): compare in u64 so
+        // the 32-bit targets cannot narrow it (usize is 32 bits on i386).
+        if (sz > @as(u64, end - p)) return false;
+        if (out.items.len + sz > HTTP_MAX_BODY) return false;
         out.appendSlice(c_alloc, in[p..][0..@intCast(sz)]) catch oom();
         p += @intCast(sz);
         if (end - p < 2 or in[p] != '\r' or in[p + 1] != '\n') return false;
